@@ -455,7 +455,7 @@ def _build_chart_slide(
     slide_num: int,
     total_slides: int,
 ):
-    """Build a slide with a native chart + insight text."""
+    """Build a slide with a native chart + insight text with dynamic height budgeting."""
     slide_layout = prs.slide_layouts[6]  # blank layout
     slide = prs.slides.add_slide(slide_layout)
 
@@ -467,39 +467,42 @@ def _build_chart_slide(
     _add_title_textbox(slide, title)
 
     # Add KPI Callouts
-    _add_kpi_callouts(slide, slide_info.get("kpis", {}))
+    kpis = slide_info.get("kpis", {})
+    _add_kpi_callouts(slide, kpis)
 
     # Determine category vs value columns
-    # First column = categories, rest = values
     category_col = matched_cols[0]
     value_cols = matched_cols[1:] if len(matched_cols) > 1 else []
 
-    # If only one column provided, auto-detect: if it's categorical, count it;
-    # if it's numeric, we need a category to group by
     if not value_cols:
         if pd.api.types.is_numeric_dtype(df[category_col]):
-            # Single numeric column — create a simple bar with index as category
             value_cols = [category_col]
             category_col = df.index.name or "Index"
             if category_col not in df.columns:
                 df = df.reset_index()
         else:
-            # Single categorical column — count occurrences
             counts = df[category_col].value_counts().reset_index()
             counts.columns = [category_col, "Count"]
             df = counts
             value_cols = ["Count"]
 
+    # Dynamic Height Budgeting:
+    # Slide height = 7.5. Footer top = 6.9. Title & KPIs take up top 2.3.
+    # Total remaining space between y = 2.4 and y = 6.8 is 4.4 inches.
+    content_top = Inches(2.4)
+    max_content_h = Inches(4.3)
+    
+    # We fit the chart into the max height
+    chart_h = max_content_h
+
     # Prepare chart data from REAL dataframe
     chart_data = _prepare_chart_data(df, category_col, value_cols, chart_type)
-
-    # Map to python-pptx chart type
     xl_chart_type = CHART_TYPE_MAP.get(chart_type, XL_CHART_TYPE.COLUMN_CLUSTERED)
 
     # Add chart
     chart_frame = slide.shapes.add_chart(
         xl_chart_type,
-        CHART_LEFT, CHART_TOP, CHART_WIDTH, CHART_HEIGHT,
+        CHART_LEFT, content_top, CHART_WIDTH, chart_h,
         chart_data,
     )
 
@@ -507,7 +510,7 @@ def _build_chart_slide(
     _style_chart(chart_frame.chart, chart_type)
 
     # Add insight text box (right side)
-    _add_insight_textbox(slide, insight)
+    _add_insight_textbox(slide, insight, left=INSIGHT_LEFT, top=content_top, width=INSIGHT_WIDTH, height=chart_h)
 
     # Add footer
     _add_footer(slide, slide_num, total_slides)
@@ -521,7 +524,7 @@ def _build_table_slide(
     slide_num: int,
     total_slides: int,
 ):
-    """Build a slide with a data table + insight text."""
+    """Build a slide with a data table + insight text with dynamic row shrinking and height budgeting."""
     slide_layout = prs.slide_layouts[6]  # blank
     slide = prs.slides.add_slide(slide_layout)
 
@@ -531,37 +534,61 @@ def _build_table_slide(
     _add_title_textbox(slide, title)
 
     # Add KPI Callouts
-    _add_kpi_callouts(slide, slide_info.get("kpis", {}))
+    kpis = slide_info.get("kpis", {})
+    _add_kpi_callouts(slide, kpis)
 
-    # Prepare table data — aggregate if needed
+    # Prepare table data (no hard truncate, show all rows requested by plan)
     table_df = df[matched_cols].copy()
-
-    # If too many rows, show a summary instead
-    if len(table_df) > 15:
-        # Group by first column, aggregate others
-        cat_col = matched_cols[0]
-        agg_cols = matched_cols[1:]
-        agg_dict = {}
-        for c in agg_cols:
-            if pd.api.types.is_numeric_dtype(table_df[c]):
-                agg_dict[c] = "sum"
-            else:
-                agg_dict[c] = "first"
-        if agg_dict:
-            table_df = table_df.groupby(cat_col).agg(agg_dict).reset_index()
-        else:
-            table_df = table_df.head(15)
-
     rows = len(table_df) + 1  # +1 for header
     cols = len(matched_cols)
 
-    # Table dimensions
-    table_height = min(Inches(4.5), Inches(0.4 * rows))
+    # Dynamic Height Budgeting:
+    # Slide height = 7.5. Available vertical area for content: from y = 2.4 to y = 6.8 (4.4 inches).
+    content_top = Inches(2.4)
+    max_height_budget = Inches(4.3)
+    
+    # Reserve space for insights (minimum guaranteed height)
+    min_insight_h = Inches(1.3)
+    max_table_h = max_height_budget - min_insight_h - Inches(0.2) # leaves buffer
+
+    # Calculate row height dynamically
+    default_row_h = Inches(0.4)
+    needed_height = default_row_h * rows
+    
+    font_size = 10
+    row_h = default_row_h
+
+    if needed_height > max_table_h:
+        # Scale down row height to fit the budget
+        row_h = max_table_h / rows
+        # Sensible minimum row height (approx 0.2 inches)
+        min_row_h = Inches(0.22)
+        if row_h < min_row_h:
+            print(f"[ppt_builder] WARNING: Table has too many rows ({rows}). Even at min row height, it may overflow.")
+            row_h = min_row_h
+        
+        # Scale font down proportionally (min 8pt, default 10pt)
+        ratio = float(row_h) / float(default_row_h)
+        font_size = max(8, int(10 * ratio))
+
+    table_height = row_h * rows
+    
+    # Scale column widths if there are many columns
+    default_col_w = TABLE_WIDTH / cols
+    col_w = default_col_w
+    col_font_size = font_size
+    if cols > 6:
+        col_font_size = max(8, font_size - 1)
+
     table_shape = slide.shapes.add_table(
         rows, cols,
-        TABLE_LEFT, CHART_TOP, TABLE_WIDTH, table_height,
+        TABLE_LEFT, content_top, TABLE_WIDTH, table_height,
     )
     table = table_shape.table
+
+    # Set row heights explicitly
+    for r_idx in range(rows):
+        table.rows[r_idx].height = row_h
 
     # Style header row
     for j, col_name in enumerate(matched_cols):
@@ -571,8 +598,9 @@ def _build_table_slide(
         cell.fill.fore_color.rgb = COLOR_PRIMARY
         p = cell.text_frame.paragraphs[0]
         p.font.color.rgb = COLOR_TEXT_LIGHT
-        p.font.size = Pt(11)
+        p.font.size = Pt(max(9, col_font_size + 1))
         p.font.bold = True
+        p.alignment = PP_ALIGN.LEFT
 
     # Fill data rows
     for i in range(len(table_df)):
@@ -586,20 +614,23 @@ def _build_table_slide(
             else:
                 cell.text = str(val)
             p = cell.text_frame.paragraphs[0]
-            p.font.size = Pt(10)
+            p.font.size = Pt(col_font_size)
             p.font.color.rgb = COLOR_TEXT_DARK
+            p.alignment = PP_ALIGN.LEFT
 
             # Alternate row shading
             if i % 2 == 0:
                 cell.fill.solid()
                 cell.fill.fore_color.rgb = COLOR_BG_LIGHT
 
-    # Add insight below the table
-    insight_top = CHART_TOP + table_height + Inches(0.3)
+    # Position the insight box dynamically BELOW the table
+    insight_top = content_top + table_height + Inches(0.15)
+    insight_h = max(min_insight_h, max_height_budget - table_height)
+    
     _add_insight_textbox(
         slide, insight,
         left=TABLE_LEFT, top=insight_top,
-        width=TABLE_WIDTH, height=Inches(1.5),
+        width=TABLE_WIDTH, height=insight_h,
     )
 
     _add_footer(slide, slide_num, total_slides)
