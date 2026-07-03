@@ -53,44 +53,47 @@ Your job is to produce a structured slide plan as a JSON array.
 - The JSON must be an array of slide objects.
 - Each slide object has these exact keys:
   {
-    "title":        "Slide title (string)",
+    "title":        "Slide title (string) - MUST be unique, descriptive, and reflect the specific analysis (e.g. 'Supplier Cost Distribution' vs 'Supplier Cost Trend Over Time'). Never duplicate titles.",
     "source_sheet": "Name of the Excel sheet this slide draws data from (string)",
     "chart_type":   "One of: bar, pie, line, table, text (string)",
-    "data_columns": ["list", "of", "column", "names", "to", "chart"],
-    "insight_text": "2-3 sentence written interpretation of what the data shows. Written in professional business language appropriate for the stated audience."
+    "data_columns": ["list", "of", "column", "names", "to", "chart/table"],
+    "insight_text": "A structured string starting with a bold header followed by 2-3 bullet points. Each bullet point MUST lead with a concrete number, percentage, or key metric from the data. Format: **[Short Bold Heading]**\\n• **[Metric 1]**: Detailed explanation of data point 1...\\n• **[Metric 2]**: Trend or percentage comparison...\\n• **[Metric 3]**: Strategic takeaway or action item.",
+    "kpis":         {
+                      "KPI 1 Label": "KPI 1 Value (concrete number/metric from summary)",
+                      "KPI 2 Label": "KPI 2 Value (concrete number/metric from summary)",
+                      "KPI 3 Label": "KPI 3 Value (concrete number/metric from summary)"
+                    }
   }
 
+- Note: Every slide MUST have 2-3 specific KPIs under the 'kpis' key, populated with actual aggregate statistics from the summary (e.g. Total Revenue, Average Order Value, Total Units Sold, Supplier Count, etc.) that match the context of that slide. For "text" slides, set 'kpis' to an empty object {}.
 - For "text" chart_type slides (e.g. title slide, summary slide), set
   data_columns to an empty list [] and source_sheet to "none".
-- Choose chart_type thoughtfully:
-  • bar  → comparing categories or groups
-  • pie  → showing composition / share of a whole
-  • line → showing trends over time (requires a date/time column)
-  • table → when exact numbers matter more than visual shape
-  • text  → for title, agenda, key takeaways, or closing slides
+
+## VISUALIZATION CHOICES (VARY TYPES & MAP TO USE-CASES):
+Vary the chart types across the deck to keep it engaging. Never use the same chart type three times in a row. Choose chart type based on these mappings:
+1. **Pie Chart (`pie`)** → Use for part-to-whole share, composition, or proportions (e.g. "genre-wise billing split", "distribution of stock by category").
+2. **Line Chart (`line`)** → Use for trends over time, chronological tracking, or sequence-based changes (e.g. "daily total revenue trends", "monthly orders timeline").
+3. **Bar Chart (`bar`)** → Use for rankings, comparison of separate categories, or multi-series variables (e.g. "top 5 suppliers by stock levels", "revenue vs spend by department").
+4. **Table (`table`)** → Use for detailed lists with 3+ columns, raw parameter comparisons, or status tables (e.g. "reorder status list showing current stock, minimum stock, and unit cost").
+
+## EXAMPLES OF PROMPT → CHART-TYPE MAPPINGS:
+- *Prompt:* "Show me where most of our money is spent and how it has changed this quarter."
+  → Slide 1 (Pie): "Cost Distribution by Category" (Columns: Category, Cost)
+  → Slide 2 (Line): "Weekly Spending Trend" (Columns: Date, Cost)
+- *Prompt:* "What are our stock levels and which items are low?"
+  → Slide 1 (Bar): "Top 5 Categories by Stock Quantity" (Columns: Category, Current Stock)
+  → Slide 2 (Table): "Low Stock Inventory Alerts" (Columns: Title, Current Stock, Minimum Required Stock, Reorder Status)
 
 ## PRIVACY / IDENTIFIER RULES — CRITICAL:
-
-- Some categorical columns in the summary may be flagged with
-  "identifier_like": true. These are high-cardinality fields that likely
-  contain personally identifiable data (client names, order IDs, emails, etc.).
-- NEVER reference, quote, or use values from identifier-like columns in
-  insight_text. Do not name specific clients, people, or identifiers.
-- NEVER include identifier-like columns in data_columns for charting.
-- If all columns in a sheet are identifier-like, skip that sheet entirely.
+- Some columns may have "identifier_like": true. These contain client names, order IDs, etc.
+- NEVER put these identifier columns in data_columns and NEVER mention their values in insight_text or KPIs.
 
 ## SLIDE PLANNING GUIDELINES:
-
 - Start with a title/overview slide (chart_type: "text").
 - End with a key takeaways / summary slide (chart_type: "text").
-- Distribute the remaining slides across the available sheets based on
-  the user's stated focus areas.
-- Write insight_text as if you are presenting to the stated audience.
-  Be specific with numbers from the summary (e.g. "Revenue totalled $6.2M
-  across 30 transactions, with North region contributing the highest share").
-- Use the actual column names and sheet names from the summary — do NOT
-  invent columns that don't exist.
-- Produce exactly the number of slides requested.
+- Distribute slides across sheets. Ensure titles are descriptive and distinct.
+- Avoid leaving slides looking empty: encourage multi-variable combinations. If a sheet has multiple numeric columns (e.g. Revenue and Units Sold), include both in the data_columns list to chart them together rather than just charting a single column!
+- Use actual column and sheet names. Produce exactly the number of slides requested.
 """
 
 
@@ -100,14 +103,12 @@ Your job is to produce a structured slide plan as a JSON array.
 
 def _condense_summary(summary: dict) -> dict:
     """
-    Produce a leaner version of the data summary to fit within free-tier
-    token limits. Strips redundant per-column fields (count, non_null)
-    that the LLM doesn't need for slide planning.
+    Produce a highly compressed version of the data summary to fit within
+    strict free-tier token limits (6000 TPM). Strips all non-essential metrics.
     """
     condensed = {}
     for sheet_name, sheet_info in summary.items():
         entry = {
-            "sheet_name": sheet_info.get("sheet_name", sheet_name),
             "row_count": sheet_info.get("row_count", 0),
             "columns": {},
         }
@@ -115,17 +116,19 @@ def _condense_summary(summary: dict) -> dict:
             entry["note"] = sheet_info["note"]
 
         for col_name, col_info in sheet_info.get("columns", {}).items():
-            # Keep only the fields the LLM actually needs
             slim = {"type": col_info.get("inferred_type", "unknown")}
 
-            # Copy key stats, skip verbose ones
-            for key in ("sum", "mean", "min", "max", "median",
-                        "min_date", "max_date", "date_range_days",
-                        "unique_values", "top_values",
-                        "identifier_like", "note",
-                        "true_pct", "true_count", "false_count"):
-                if key in col_info:
+            # Only copy crucial planning stats
+            for key in ("sum", "mean", "min_date", "max_date", "unique_values"):
+                if key in col_info and col_info[key] is not None:
                     slim[key] = col_info[key]
+
+            # Limit top values to top 3 to save tokens
+            if "top_values" in col_info and col_info["top_values"]:
+                slim["top_values"] = dict(list(col_info["top_values"].items())[:3])
+
+            if col_info.get("identifier_like"):
+                slim["identifier_like"] = True
 
             entry["columns"][col_name] = slim
 
@@ -177,6 +180,9 @@ def _parse_slide_plan(raw_text: str) -> list:
         missing = required_keys - slide.keys()
         if missing:
             raise ValueError(f"Slide {i} missing keys: {missing}")
+        # Default missing KPIs to empty dict
+        if "kpis" not in slide or not isinstance(slide["kpis"], dict):
+            slide["kpis"] = {}
         # Normalise chart_type
         slide["chart_type"] = slide["chart_type"].lower().strip()
         if slide["chart_type"] not in VALID_CHART_TYPES:

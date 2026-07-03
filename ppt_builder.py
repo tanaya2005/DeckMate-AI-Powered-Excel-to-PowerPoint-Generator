@@ -43,16 +43,21 @@ COLOR_TEXT_DARK   = RGBColor(0x33, 0x33, 0x33)  # Near-black
 COLOR_TEXT_LIGHT  = RGBColor(0xFF, 0xFF, 0xFF)  # White
 COLOR_SUBTITLE    = RGBColor(0x66, 0x66, 0x66)  # Grey
 
-# Chart colours (cycle through these for series)
+# Branded 6-Color Palette
+COLOR_TEAL   = RGBColor(0x2E, 0x86, 0xAB)  # Teal
+COLOR_CORAL  = RGBColor(0xE8, 0x6F, 0x51)  # Coral
+COLOR_AMBER  = RGBColor(0xF2, 0xB7, 0x05)  # Amber
+COLOR_SAGE   = RGBColor(0x76, 0x9A, 0x6B)  # Sage Green
+COLOR_SLATE  = RGBColor(0x6C, 0x7A, 0x89)  # Slate
+COLOR_LAVENDER = RGBColor(0x9B, 0x59, 0xB6) # Purple/Lavender
+
 CHART_COLORS = [
-    RGBColor(0x2E, 0x86, 0xAB),  # Teal
-    RGBColor(0xE8, 0x6F, 0x51),  # Coral
-    RGBColor(0x4E, 0xC5, 0xA0),  # Mint
-    RGBColor(0xF2, 0xB7, 0x05),  # Gold
-    RGBColor(0x9B, 0x59, 0xB6),  # Purple
-    RGBColor(0xE7, 0x4C, 0x3C),  # Red
-    RGBColor(0x34, 0x98, 0xDB),  # Blue
-    RGBColor(0x1A, 0xBC, 0x9C),  # Emerald
+    COLOR_TEAL,
+    COLOR_CORAL,
+    COLOR_AMBER,
+    COLOR_SAGE,
+    COLOR_SLATE,
+    COLOR_LAVENDER
 ]
 
 # Chart type mapping
@@ -62,30 +67,31 @@ CHART_TYPE_MAP = {
     "line": XL_CHART_TYPE.LINE_MARKERS,
 }
 
-# Layout positions
+# Layout positions (Wider elements to fill up whitespace)
 TITLE_LEFT   = Inches(0.6)
-TITLE_TOP    = Inches(0.3)
-TITLE_WIDTH  = Inches(12.0)
+TITLE_TOP    = Inches(0.4)
+TITLE_WIDTH  = Inches(12.133)
 TITLE_HEIGHT = Inches(0.8)
 
+# Lowered chart/insight box to accommodate KPI callouts on top
 CHART_LEFT   = Inches(0.6)
-CHART_TOP    = Inches(1.3)
-CHART_WIDTH  = Inches(7.5)
-CHART_HEIGHT = Inches(5.2)
+CHART_TOP    = Inches(2.5)       # Shifted down from 1.4 to 2.5
+CHART_WIDTH  = Inches(7.8)
+CHART_HEIGHT = Inches(4.1)       # Shrunk height from 5.0 to 4.1
 
-INSIGHT_LEFT   = Inches(8.4)
-INSIGHT_TOP    = Inches(1.3)
-INSIGHT_WIDTH  = Inches(4.3)
-INSIGHT_HEIGHT = Inches(5.2)
+INSIGHT_LEFT   = Inches(8.7)
+INSIGHT_TOP    = Inches(2.5)       # Shifted down from 1.4 to 2.5
+INSIGHT_WIDTH  = Inches(4.0)
+INSIGHT_HEIGHT = Inches(4.1)       # Shrunk height from 5.0 to 4.1
 
 TABLE_LEFT   = Inches(0.6)
-TABLE_TOP    = Inches(1.3)
-TABLE_WIDTH  = Inches(12.0)
+TABLE_TOP    = Inches(2.5)
+TABLE_WIDTH  = Inches(12.133)
 
 FOOTER_LEFT   = Inches(0.6)
-FOOTER_TOP    = Inches(6.8)
-FOOTER_WIDTH  = Inches(12.0)
-FOOTER_HEIGHT = Inches(0.5)
+FOOTER_TOP    = Inches(6.9)
+FOOTER_WIDTH  = Inches(12.133)
+FOOTER_HEIGHT = Inches(0.4)
 
 
 # ---------------------------------------------------------------------------
@@ -137,57 +143,195 @@ def _resolve_columns(
 # Slide builders
 # ---------------------------------------------------------------------------
 
+def _add_kpi_callouts(slide, kpis: dict):
+    """Draw a row of styled KPI callout boxes at the top of the slide."""
+    if not kpis:
+        return
+
+    # Filter out empty entries
+    valid_kpis = {k: v for k, v in kpis.items() if k and v}
+    if not valid_kpis:
+        return
+
+    # Limit to max 3 KPIs to fit the width
+    items = list(valid_kpis.items())[:3]
+    count = len(items)
+
+    # Box coordinates
+    kpi_y = Inches(1.3)
+    kpi_h = Inches(0.9)
+    total_w = Inches(12.133)
+    
+    # Calculate box width and spacing dynamically
+    box_w = Inches(3.6)
+    spacing = Inches(0.4)
+    
+    # Left margin offset to center the KPIs container
+    container_w = (box_w * count) + (spacing * (count - 1))
+    start_x = Inches(0.6) + (total_w - container_w) / 2
+
+    from pptx.enum.shapes import MSO_SHAPE
+    
+    for i, (label, val) in enumerate(items):
+        box_x = start_x + i * (box_w + spacing)
+        
+        # Add a rounded rectangle background card for each KPI
+        card = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, box_x, kpi_y, box_w, kpi_h)
+        card.fill.solid()
+        card.fill.fore_color.rgb = COLOR_BG_LIGHT
+        card.line.color.rgb = COLOR_SECONDARY
+        card.line.width = Pt(1.5)
+        
+        # Add textbox inside the card for label and value
+        txBox = slide.shapes.add_textbox(box_x, kpi_y + Inches(0.05), box_w, kpi_h - Inches(0.1))
+        tf = txBox.text_frame
+        tf.word_wrap = True
+        tf.auto_size = None
+        
+        # KPI Value (large, bold)
+        p_val = tf.paragraphs[0]
+        p_val.text = str(val)
+        p_val.font.size = Pt(20)
+        p_val.font.bold = True
+        p_val.font.color.rgb = COLOR_PRIMARY
+        p_val.alignment = PP_ALIGN.CENTER
+        
+        # KPI Label (small, gray)
+        p_lbl = tf.add_paragraph()
+        p_lbl.text = str(label).upper()
+        p_lbl.font.size = Pt(9)
+        p_lbl.font.bold = True
+        p_lbl.font.color.rgb = COLOR_SECONDARY
+        p_lbl.alignment = PP_ALIGN.CENTER
+
 def _add_title_textbox(slide, title_text: str):
-    """Add a styled title text box to the top of a slide."""
+    """Add a styled title text box to the top of a slide, stripping markdown bold."""
     txBox = slide.shapes.add_textbox(TITLE_LEFT, TITLE_TOP, TITLE_WIDTH, TITLE_HEIGHT)
     tf = txBox.text_frame
     tf.word_wrap = True
     p = tf.paragraphs[0]
-    p.text = title_text
-    p.font.size = Pt(28)
-    p.font.bold = True
-    p.font.color.rgb = COLOR_PRIMARY
     p.alignment = PP_ALIGN.LEFT
+    
+    parts = title_text.split("**")
+    for idx, part in enumerate(parts):
+        if not part:
+            continue
+        run = p.add_run()
+        run.text = part
+        run.font.size = Pt(28)
+        run.font.bold = True
+        run.font.color.rgb = COLOR_PRIMARY
 
 
 def _add_insight_textbox(slide, insight_text: str, left=None, top=None,
                          width=None, height=None):
-    """Add a styled insight text box."""
+    """Add a styled insight text box, rendering subheadings and bullet points properly over a light card background."""
+    x = left or INSIGHT_LEFT
+    y = top or INSIGHT_TOP
+    w = width or INSIGHT_WIDTH
+    h = height or INSIGHT_HEIGHT
+
+    # Add light background card shape (rounded rectangle or rectangle)
+    from pptx.enum.shapes import MSO_SHAPE
+    card = slide.shapes.add_shape(
+        MSO_SHAPE.RECTANGLE, x, y, w, h
+    )
+    card.fill.solid()
+    card.fill.fore_color.rgb = COLOR_BG_LIGHT
+    card.line.fill.background() # No border
+    
+    # Add text box on top of the card (with slight margins)
+    margin = Inches(0.25)
     txBox = slide.shapes.add_textbox(
-        left or INSIGHT_LEFT,
-        top or INSIGHT_TOP,
-        width or INSIGHT_WIDTH,
-        height or INSIGHT_HEIGHT,
+        x + margin,
+        y + margin,
+        w - (margin * 2),
+        h - (margin * 2),
     )
     tf = txBox.text_frame
     tf.word_wrap = True
     tf.auto_size = None
 
-    # Add a subtle label
+    # Title label
     label_p = tf.paragraphs[0]
-    label_p.text = "KEY INSIGHT"
-    label_p.font.size = Pt(10)
+    label_p.text = "ANALYSIS & KEY INSIGHTS"
+    label_p.font.size = Pt(11)
     label_p.font.bold = True
     label_p.font.color.rgb = COLOR_SECONDARY
-    label_p.space_after = Pt(8)
+    label_p.space_after = Pt(12)
 
-    # Add the actual insight text
-    insight_p = tf.add_paragraph()
-    insight_p.text = insight_text
-    insight_p.font.size = Pt(14)
-    insight_p.font.color.rgb = COLOR_TEXT_DARK
-    insight_p.line_spacing = Pt(20)
+    # Split the insight text into segments
+    lines = insight_text.replace("\\n", "\n").split("\n")
+    for line in lines:
+        line_str = line.strip()
+        if not line_str:
+            continue
+
+        p = tf.add_paragraph()
+        p.space_after = Pt(8)
+        p.line_spacing = Pt(18)
+
+        # Check if it's a bullet point
+        if line_str.startswith("•") or line_str.startswith("-") or line_str.startswith("*"):
+            # Strip the bullet char
+            content = line_str.lstrip("•-* ").strip()
+            # Style bullet paragraph
+            p.level = 0
+            p.space_before = Pt(4)
+            # Add bullet symbol explicitly
+            run_bullet = p.add_run()
+            run_bullet.text = "•  "
+            run_bullet.font.size = Pt(13)
+            run_bullet.font.bold = True
+            run_bullet.font.color.rgb = COLOR_SECONDARY
+
+            # Parse bold text within the bullet
+            _add_formatted_runs(p, content)
+        else:
+            # Normal line or heading
+            _add_formatted_runs(p, line_str)
+
+
+def _add_formatted_runs(paragraph, text: str):
+    """Parse text and add bold/normal runs (looks for **text**)."""
+    parts = text.split("**")
+    for idx, part in enumerate(parts):
+        if not part:
+            continue
+        run = paragraph.add_run()
+        run.text = part
+        run.font.size = Pt(12)
+        run.font.color.rgb = COLOR_TEXT_DARK
+
+        # Odd indices are inside the ** ** block, so they should be bolded
+        if idx % 2 == 1:
+            run.font.bold = True
+            run.font.color.rgb = COLOR_PRIMARY
+        else:
+            run.font.bold = False
 
 
 def _add_footer(slide, slide_num: int, total_slides: int):
-    """Add a subtle footer with slide number."""
+    """Add a subtle footer with slide number and color palette signature."""
     txBox = slide.shapes.add_textbox(FOOTER_LEFT, FOOTER_TOP, FOOTER_WIDTH, FOOTER_HEIGHT)
     tf = txBox.text_frame
-    p = tf.paragraphs[0]
-    p.text = f"DeckMate  |  Slide {slide_num} of {total_slides}"
-    p.font.size = Pt(9)
-    p.font.color.rgb = COLOR_SUBTITLE
-    p.alignment = PP_ALIGN.RIGHT
+    tf.word_wrap = True
+    
+    # Left paragraph - Palette Legend
+    p_left = tf.paragraphs[0]
+    p_left.text = "Palette: Teal ■ Coral ■ Amber ■ Sage ■ Slate ■ Lavender"
+    p_left.font.size = Pt(8.5)
+    p_left.font.color.rgb = COLOR_SUBTITLE
+    p_left.alignment = PP_ALIGN.LEFT
+    
+    # Right text frame for slide number
+    txBox_right = slide.shapes.add_textbox(FOOTER_WIDTH - Inches(2.5), FOOTER_TOP, Inches(2.5), FOOTER_HEIGHT)
+    tf_right = txBox_right.text_frame
+    p_right = tf_right.paragraphs[0]
+    p_right.text = f"DeckMate  |  Slide {slide_num} of {total_slides}"
+    p_right.font.size = Pt(9)
+    p_right.font.color.rgb = COLOR_SUBTITLE
+    p_right.alignment = PP_ALIGN.RIGHT
 
 
 def _style_chart(chart, chart_type: str):
@@ -197,11 +341,23 @@ def _style_chart(chart, chart_type: str):
     chart.legend.position = XL_LEGEND_POSITION.BOTTOM
     chart.legend.font.size = Pt(9)
 
-    # Style the series colours
+    # Style the series/points colours
+    has_points = (chart_type in ("pie", "bar"))
+    
     for i, series in enumerate(chart.series):
+        # Determine series level color
         color = CHART_COLORS[i % len(CHART_COLORS)]
-        series.format.fill.solid()
-        series.format.fill.fore_color.rgb = color
+        
+        # If single series and is bar or pie, color individual points differently
+        if len(chart.series) == 1 and has_points and hasattr(series, "points"):
+            for p_idx in range(len(series.points)):
+                pt = series.points[p_idx]
+                pt_color = CHART_COLORS[p_idx % len(CHART_COLORS)]
+                pt.format.fill.solid()
+                pt.format.fill.fore_color.rgb = pt_color
+        else:
+            series.format.fill.solid()
+            series.format.fill.fore_color.rgb = color
 
         # Line charts: style the line and markers
         if chart_type == "line":
@@ -310,6 +466,9 @@ def _build_chart_slide(
     # Add title
     _add_title_textbox(slide, title)
 
+    # Add KPI Callouts
+    _add_kpi_callouts(slide, slide_info.get("kpis", {}))
+
     # Determine category vs value columns
     # First column = categories, rest = values
     category_col = matched_cols[0]
@@ -370,6 +529,9 @@ def _build_table_slide(
     insight = slide_info.get("insight_text", "")
 
     _add_title_textbox(slide, title)
+
+    # Add KPI Callouts
+    _add_kpi_callouts(slide, slide_info.get("kpis", {}))
 
     # Prepare table data — aggregate if needed
     table_df = df[matched_cols].copy()
@@ -464,11 +626,17 @@ def _build_text_slide(
     tf = txBox.text_frame
     tf.word_wrap = True
     p = tf.paragraphs[0]
-    p.text = title
-    p.font.size = Pt(36)
-    p.font.bold = True
-    p.font.color.rgb = COLOR_PRIMARY
     p.alignment = PP_ALIGN.CENTER
+    
+    parts_title = title.split("**")
+    for idx, part in enumerate(parts_title):
+        if not part:
+            continue
+        run = p.add_run()
+        run.text = part
+        run.font.size = Pt(36)
+        run.font.bold = True
+        run.font.color.rgb = COLOR_PRIMARY
 
     # Body text
     if insight:
@@ -478,11 +646,20 @@ def _build_text_slide(
         bf = body_box.text_frame
         bf.word_wrap = True
         bp = bf.paragraphs[0]
-        bp.text = insight
-        bp.font.size = Pt(18)
-        bp.font.color.rgb = COLOR_TEXT_DARK
-        bp.line_spacing = Pt(28)
         bp.alignment = PP_ALIGN.CENTER
+        bp.line_spacing = Pt(28)
+        
+        parts_body = insight.replace("\\n", "\n").split("**")
+        for idx, part in enumerate(parts_body):
+            if not part:
+                continue
+            run = bp.add_run()
+            run.text = part
+            run.font.size = Pt(18)
+            run.font.color.rgb = COLOR_TEXT_DARK
+            if idx % 2 == 1:
+                run.font.bold = True
+                run.font.color.rgb = COLOR_PRIMARY
 
     # Fallback notice
     if is_fallback:
@@ -578,13 +755,14 @@ def build_presentation(
 
         # ------- BUILD THE APPROPRIATE SLIDE TYPE -------
         try:
+            df_copy = df.copy()
             if chart_type in ("bar", "pie", "line"):
                 _build_chart_slide(
-                    prs, slide_info, df, matched_cols, slide_num, total_slides,
+                    prs, slide_info, df_copy, matched_cols, slide_num, total_slides,
                 )
             elif chart_type == "table":
                 _build_table_slide(
-                    prs, slide_info, df, matched_cols, slide_num, total_slides,
+                    prs, slide_info, df_copy, matched_cols, slide_num, total_slides,
                 )
             else:
                 _build_text_slide(prs, slide_info, slide_num, total_slides)
