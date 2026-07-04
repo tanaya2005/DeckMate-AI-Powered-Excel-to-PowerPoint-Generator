@@ -17,10 +17,13 @@ import re
 import sys
 from typing import Any, Dict, Optional
 
-from dotenv import load_dotenv
-from groq import Groq
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
-load_dotenv()
+from groq import Groq
 
 # ---------------------------------------------------------------------------
 # Constants
