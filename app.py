@@ -26,119 +26,139 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ---------------------------------------------------------------------------
-# Custom CSS for a premium look
+# ---------------------------------------------------------------------------# Custom CSS for a clean, beautiful premium look (White Mode)
 # ---------------------------------------------------------------------------
 
 st.markdown("""
 <style>
+    /* Global Background and Typography */
+    .stApp {
+        background-color: #ffffff;
+        color: #333333;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    
     /* Main container */
     .main .block-container {
-        padding-top: 2rem;
-        max-width: 900px;
+        padding-top: 3rem;
+        max-width: 960px;
     }
 
     /* Header styling */
     .hero-title {
-        font-size: 2.4rem;
+        font-size: 2.8rem;
         font-weight: 800;
         color: #1B2A4A;
-        margin-bottom: 0.2rem;
-        letter-spacing: -0.5px;
+        margin-bottom: 0.1rem;
+        letter-spacing: -0.8px;
     }
     .hero-subtitle {
-        font-size: 1.1rem;
-        color: #666;
-        margin-bottom: 2rem;
+        font-size: 1.15rem;
+        color: #555555;
+        margin-bottom: 2.5rem;
         line-height: 1.6;
     }
 
-    /* Card-like sections */
+    /* Clean Card Sections */
     .config-section {
-        background: #f8f9fa;
+        background: #ffffff;
         border-radius: 12px;
-        padding: 1.5rem;
+        padding: 1.75rem;
         margin-bottom: 1.5rem;
-        border: 1px solid #e9ecef;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
     }
     .config-section h3 {
         color: #1B2A4A;
-        font-size: 1rem;
-        font-weight: 600;
+        font-size: 1.1rem;
+        font-weight: 700;
         margin-bottom: 0.8rem;
     }
 
-    /* Upload area */
+    /* Upload area styling */
     [data-testid="stFileUploader"] {
+        border: 1px dashed #cbd5e1;
         border-radius: 12px;
+        padding: 1rem;
+        background-color: #f8fafc;
     }
 
-    /* Generate button */
+    /* Primary Generate button with Teal-to-Navy gradient */
     .stButton > button {
         background: linear-gradient(135deg, #2E86AB 0%, #1B2A4A 100%);
         color: white;
         border: none;
-        padding: 0.75rem 2rem;
-        font-size: 1.1rem;
+        padding: 0.85rem 2.2rem;
+        font-size: 1.15rem;
         font-weight: 600;
         border-radius: 8px;
         width: 100%;
-        transition: all 0.3s ease;
+        box-shadow: 0 10px 15px -3px rgba(46, 134, 171, 0.25);
+        transition: all 0.2s ease-in-out;
     }
     .stButton > button:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 4px 15px rgba(46, 134, 171, 0.4);
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px -2px rgba(46, 134, 171, 0.35);
+        color: #ffffff !important;
     }
     .stButton > button:active {
         transform: translateY(0);
     }
 
-    /* Sidebar */
+    /* Sidebar (White Mode styling) */
     [data-testid="stSidebar"] {
-        background: #f8f9fa;
+        background-color: #f8fafc;
+        border-right: 1px solid #e2e8f0;
+    }
+    [data-testid="stSidebar"] .block-container {
+        padding-top: 2rem;
     }
 
-    /* Privacy badge */
+    /* Clean white privacy badge */
     .privacy-badge {
-        background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%);
-        border: 1px solid #c8e6c9;
+        background-color: #f0fdf4;
+        border: 1px solid #bbf7d0;
         border-radius: 10px;
-        padding: 1rem;
+        padding: 1.25rem;
         margin-top: 1rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.02);
     }
     .privacy-badge h4 {
-        color: #2e7d32;
-        font-size: 0.9rem;
-        margin-bottom: 0.5rem;
+        color: #166534;
+        font-size: 0.95rem;
+        font-weight: 700;
+        margin-top: 0;
+        margin-bottom: 0.4rem;
     }
     .privacy-badge p {
-        color: #555;
-        font-size: 0.8rem;
+        color: #1e3a1e;
+        font-size: 0.85rem;
         line-height: 1.5;
         margin: 0;
     }
 
-    /* Pipeline steps */
+    /* Pipeline steps indicator */
     .pipeline-step {
         display: flex;
         align-items: center;
-        padding: 0.4rem 0;
-        color: #666;
-        font-size: 0.85rem;
+        padding: 0.5rem 0;
+        color: #475569;
+        font-size: 0.9rem;
+        font-weight: 500;
     }
     .pipeline-step .step-num {
         background: #2E86AB;
         color: white;
-        width: 22px;
-        height: 22px;
+        width: 24px;
+        height: 24px;
         border-radius: 50%;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        font-size: 0.7rem;
+        font-size: 0.75rem;
         font-weight: 700;
-        margin-right: 0.6rem;
-        flex-shrink: 0;
+        margin-right: 0.75rem;
+        box-shadow: 0 2px 4px rgba(46, 134, 171, 0.2);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -282,6 +302,9 @@ generate_clicked = st.button(
 # ---- Full pipeline (Day 5) ----
 if generate_clicked and uploaded_file:
 
+    # --- Clamping slide count in code ---
+    num_slides = max(3, min(15, num_slides))
+
     # --- File size validation ---
     file_size_mb = uploaded_file.size / (1024 * 1024)
     if file_size_mb > 10:
@@ -309,38 +332,49 @@ if generate_clicked and uploaded_file:
 
     try:
         # Stage 1: Parse Excel
-        with st.status("Generating your deck...", expanded=True) as status:
-            st.write("📖 Reading your data...")
+        with st.status("Reading your data...", expanded=True) as status:
             file_bytes = io.BytesIO(uploaded_file.getvalue())
             try:
                 summary, dataframes = parse_excel(file_bytes)
-            except ValueError as e:
+            except Exception as e:
+                status.update(label="Failed to read file", state="error")
                 st.error(f"Could not read this Excel file: {e}")
                 st.stop()
 
-            sheet_names = [s for s, info in summary.items()
-                          if info.get("row_count", 0) > 0]
+            # --- Structural data validation ---
+            sheet_names = [s for s, info in summary.items() if info.get("row_count", 0) > 0]
             if not sheet_names:
-                st.error(
-                    "No usable data found in this file. "
-                    "All sheets appear to be empty."
-                )
+                status.update(label="Empty Excel File", state="error")
+                st.error("No usable data found in this file. All sheets appear to be empty.")
                 st.stop()
 
-            st.write(
-                f"Found **{len(sheet_names)}** sheets with data: "
-                f"{', '.join(sheet_names)}"
-            )
+            # Check if there is at least one usable numeric or categorical column across all sheets
+            total_columns = 0
+            for s in sheet_names:
+                cols_dict = summary[s].get("columns", {})
+                total_columns += len(cols_dict)
+            
+            if total_columns == 0:
+                status.update(label="No columns to chart", state="error")
+                st.error("The Excel file doesn't contain any columns or headers. Nothing to chart!")
+                st.stop()
+
+            status.update(label="Understanding your data structure...")
+            st.write(f"✓ Found **{len(sheet_names)}** sheets containing **{total_columns}** columns.")
 
             # Stage 2: LLM Planning
-            st.write("🧠 Planning your deck...")
+            status.update(label="Planning your deck with AI...")
             try:
+                # Provide a suggested deck title to pass to ppt_builder
+                deck_title = f"{os.path.splitext(uploaded_file.name)[0].replace('_', ' ').title()} Deck"
                 slide_plan = generate_slide_plan(
                     data_summary=summary,
                     user_prompt=final_prompt,
                     num_slides=num_slides,
                 )
+                slide_plan["title_slide_title"] = deck_title
             except ValueError as e:
+                status.update(label="AI Planning Failed", state="error")
                 st.error(
                     f"The AI returned an invalid response. "
                     f"Please try again — this usually works on retry.\n\n"
@@ -348,15 +382,15 @@ if generate_clicked and uploaded_file:
                 )
                 st.stop()
             except RuntimeError as e:
+                status.update(label="AI Service Error", state="error")
                 st.error(f"AI service error: {e}")
                 st.stop()
 
             n_slides = slide_plan.get("num_slides_returned", 0)
-            st.write(f"Planned **{n_slides}** slides")
+            st.write(f"✓ AI slide plan complete ({n_slides} content slides planned).")
 
             # Stage 3: Build PPTX
-            st.write("📊 Building slides & charts...")
-
+            status.update(label="Building slides...")
             # Create temp file — use delete=False so we can read it back
             temp_fd, temp_path = tempfile.mkstemp(suffix=".pptx")
             os.close(temp_fd)  # close the file descriptor, ppt_builder will write to path
@@ -364,15 +398,16 @@ if generate_clicked and uploaded_file:
             try:
                 build_presentation(slide_plan, dataframes, temp_path)
             except Exception as e:
+                status.update(label="Slide building failed", state="error")
                 st.error(f"Error building the presentation: {e}")
                 st.stop()
 
+            status.update(label="Finalizing...")
             # Read the generated file into memory immediately
             with open(temp_path, "rb") as f:
                 pptx_bytes = f.read()
 
-            status.update(label="Deck ready!", state="complete", expanded=True)
-            st.write("✅ Done!")
+            status.update(label="Deck ready!", state="complete", expanded=False)
 
         # --- Download button ---
         st.markdown("---")

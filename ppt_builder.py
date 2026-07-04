@@ -707,6 +707,7 @@ def build_presentation(
 ) -> str:
     """
     Build a PowerPoint presentation from the slide plan and real DataFrames.
+    Automatically prepends a Title Slide and appends a Closing Slide.
 
     Parameters
     ----------
@@ -719,7 +720,7 @@ def build_presentation(
 
     Returns
     -------
-    str — the output path (for chaining).
+    str — the output path.
     """
     prs = Presentation()
 
@@ -728,10 +729,50 @@ def build_presentation(
     prs.slide_height = SLIDE_HEIGHT
 
     slides = slide_plan.get("slides", [])
-    total_slides = len(slides)
+    
+    # We will insert a Title Slide (Slide 1) and a Closing Slide (Last Slide)
+    # Total count = len(slides) + 2
+    total_slides = len(slides) + 2
 
+    # 1. PREPEND TITLE SLIDE
+    title_layout = prs.slide_layouts[6] # blank
+    title_slide = prs.slides.add_slide(title_layout)
+    
+    # Draw dark navy accent panel at the bottom or left
+    from pptx.enum.shapes import MSO_SHAPE
+    accent_bar = title_slide.shapes.add_shape(
+        MSO_SHAPE.RECTANGLE, Inches(0), Inches(4.8), Inches(13.333), Inches(0.4)
+    )
+    accent_bar.fill.solid()
+    accent_bar.fill.fore_color.rgb = COLOR_SECONDARY
+    accent_bar.line.fill.background()
+    
+    # Title Text Box
+    t_box = title_slide.shapes.add_textbox(Inches(1.0), Inches(2.0), Inches(11.333), Inches(1.5))
+    tf = t_box.text_frame
+    tf.word_wrap = True
+    p = tf.paragraphs[0]
+    p.text = slide_plan.get("title_slide_title", "Data Analysis & Business Report")
+    p.font.size = Pt(44)
+    p.font.bold = True
+    p.font.color.rgb = COLOR_PRIMARY
+    
+    # Subtitle Text Box
+    s_box = title_slide.shapes.add_textbox(Inches(1.0), Inches(3.6), Inches(11.333), Inches(1.0))
+    s_tf = s_box.text_frame
+    s_tf.word_wrap = True
+    sp = s_tf.paragraphs[0]
+    from datetime import datetime
+    current_date = datetime.now().strftime("%B %d, %Y")
+    sp.text = f"Prepared automatically on {current_date} | Powered by DeckMate"
+    sp.font.size = Pt(16)
+    sp.font.color.rgb = COLOR_SUBTITLE
+    
+    _add_footer(title_slide, 1, total_slides)
+
+    # 2. RENDER CONTENT SLIDES
     for idx, slide_info in enumerate(slides):
-        slide_num = idx + 1
+        slide_num = idx + 2 # +1 for index, +1 for Title Slide offset
         chart_type = slide_info.get("chart_type", "text").lower().strip()
         source_sheet = slide_info.get("source_sheet", "none")
         data_columns = slide_info.get("data_columns", [])
@@ -791,6 +832,37 @@ def build_presentation(
             print(f"[ppt_builder] ERROR building slide {slide_num}: {e}. "
                   f"Falling back to text slide.")
             _build_text_slide(prs, slide_info, slide_num, total_slides, is_fallback=True)
+
+    # 3. APPEND CLOSING SLIDE (Thank You Slide)
+    closing_layout = prs.slide_layouts[6]
+    closing_slide = prs.slides.add_slide(closing_layout)
+    
+    # Draw navy backdrop block on the left
+    left_block = closing_slide.shapes.add_shape(
+        MSO_SHAPE.RECTANGLE, Inches(0), Inches(0), Inches(4.5), Inches(7.5)
+    )
+    left_block.fill.solid()
+    left_block.fill.fore_color.rgb = COLOR_PRIMARY
+    left_block.line.fill.background()
+    
+    # Add Large Thank You Text
+    close_box = closing_slide.shapes.add_textbox(Inches(5.2), Inches(2.2), Inches(7.0), Inches(2.5))
+    close_tf = close_box.text_frame
+    close_tf.word_wrap = True
+    
+    p_thank = close_tf.paragraphs[0]
+    p_thank.text = "Thank You"
+    p_thank.font.size = Pt(54)
+    p_thank.font.bold = True
+    p_thank.font.color.rgb = COLOR_PRIMARY
+    
+    p_sub = close_tf.add_paragraph()
+    p_sub.text = "Questions & Discussion"
+    p_sub.font.size = Pt(20)
+    p_sub.font.color.rgb = COLOR_SECONDARY
+    p_sub.space_before = Pt(12)
+    
+    _add_footer(closing_slide, total_slides, total_slides)
 
     # Save
     prs.save(output_path)
