@@ -88,6 +88,12 @@ GROQ_API_KEY=your_key_here
 Run locally:
 ```bash
 streamlit run app.py
+
+OR 
+
+
+python -m streamlit run app.py
+
 ```
 
 ---

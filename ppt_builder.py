@@ -312,26 +312,14 @@ def _add_formatted_runs(paragraph, text: str):
 
 
 def _add_footer(slide, slide_num: int, total_slides: int):
-    """Add a subtle footer with slide number and color palette signature."""
+    """Add a subtle footer with slide number."""
     txBox = slide.shapes.add_textbox(FOOTER_LEFT, FOOTER_TOP, FOOTER_WIDTH, FOOTER_HEIGHT)
     tf = txBox.text_frame
-    tf.word_wrap = True
-    
-    # Left paragraph - Palette Legend
-    p_left = tf.paragraphs[0]
-    p_left.text = "Palette: Teal ■ Coral ■ Amber ■ Sage ■ Slate ■ Lavender"
-    p_left.font.size = Pt(8.5)
-    p_left.font.color.rgb = COLOR_SUBTITLE
-    p_left.alignment = PP_ALIGN.LEFT
-    
-    # Right text frame for slide number
-    txBox_right = slide.shapes.add_textbox(FOOTER_WIDTH - Inches(2.5), FOOTER_TOP, Inches(2.5), FOOTER_HEIGHT)
-    tf_right = txBox_right.text_frame
-    p_right = tf_right.paragraphs[0]
-    p_right.text = f"DeckMate  |  Slide {slide_num} of {total_slides}"
-    p_right.font.size = Pt(9)
-    p_right.font.color.rgb = COLOR_SUBTITLE
-    p_right.alignment = PP_ALIGN.RIGHT
+    p = tf.paragraphs[0]
+    p.text = f"DeckMate  |  Slide {slide_num} of {total_slides}"
+    p.font.size = Pt(9)
+    p.font.color.rgb = COLOR_SUBTITLE
+    p.alignment = PP_ALIGN.RIGHT
 
 
 def _style_chart(chart, chart_type: str):
