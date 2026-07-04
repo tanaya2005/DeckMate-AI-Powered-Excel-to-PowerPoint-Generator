@@ -228,11 +228,22 @@ def generate_slide_plan(
     dict with key "slides" containing the list of slide plan dicts.
     """
     # Resolve API key
-    key = api_key or os.environ.get("GROQ_API_KEY")
+    key = api_key
+    if not key:
+        # Check Streamlit secrets first
+        try:
+            import streamlit as st
+            if "GROQ_API_KEY" in st.secrets:
+                key = st.secrets["GROQ_API_KEY"]
+        except Exception:
+            pass
+    if not key:
+        key = os.environ.get("GROQ_API_KEY")
+        
     if not key:
         raise RuntimeError(
-            "No Groq API key found. Set GROQ_API_KEY in your .env file "
-            "or pass api_key= directly."
+            "No Groq API key found. Set GROQ_API_KEY in your .env file, "
+            "as a Streamlit secret, or pass api_key= directly."
         )
 
     client = Groq(api_key=key)
