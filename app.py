@@ -26,188 +26,374 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ---------------------------------------------------------------------------# Custom CSS for a clean, beautiful premium look (White Mode)
+# ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Custom CSS matching Stitch Design ("DeckMate Generator")
 # ---------------------------------------------------------------------------
 
 st.markdown("""
 <style>
-    /* Global Background and Typography */
-    .stApp {
-        background-color: #ffffff;
-        color: #333333;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    /* Google Fonts & Material Icons */
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+    @import url('https://fonts.googleapis.com/icon?family=Material+Icons+Outlined');
+
+    /* Global Typography & Palette (Theme Independent overrides) */
+    :root {
+        --primary-color: #2563eb !important;
+        --background-color: #f7f9fb !important;
+        --secondary-background-color: #f2f4f6 !important;
+        --text-color: #0f172a !important;
+    }
+
+    html, body, [data-testid="stAppViewContainer"], .stApp {
+        background-color: #f7f9fb !important;
+        color: #0f172a !important;
+        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
+    }
+
+    /* Override Streamlit base light-dark mode variable controls for borders & texts */
+    div, span, p, label, select, input, textarea, button {
+        border-color: #cbd5e1 !important;
+    }
+
+    /* Main container bounds */
+    .main .block-container {
+        padding-top: 2rem !important;
+        padding-bottom: 4rem !important;
+        max-width: 1000px !important;
+    }
+
+    /* Title & Welcome Hero styling */
+    .welcome-badge {
+        color: #2563eb !important;
+        font-weight: 700;
+        font-size: 0.875rem;
+        margin-bottom: 0.5rem;
+    }
+    .welcome-title {
+        font-size: 2.25rem;
+        font-weight: 800;
+        color: #0f172a !important;
+        margin-bottom: 0.75rem;
+        letter-spacing: -0.5px;
+        line-height: 1.25;
+    }
+    .welcome-desc {
+        font-size: 1rem;
+        color: #64748b !important;
+        line-height: 1.6;
+        margin-bottom: 2rem;
+    }
+
+    /* Force controls to render high-contrast white mode regardless of system preferences */
+    [data-testid="stTextarea"] textarea,
+    [data-testid="stSelectbox"] select,
+    [data-testid="stNumberInput"] input,
+    [data-testid="stTextInput"] input,
+    [data-testid="stFileUploader"],
+    [data-testid="stFileUploader"] > div,
+    [data-testid="stFileUploaderDropzone"],
+    .stTextInput input,
+    select,
+    textarea,
+    input {
+        color: #0f172a !important;
+        background-color: #ffffff !important;
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 8px !important;
+        font-size: 0.875rem !important;
+    }
+
+    [data-testid="stTextarea"] textarea::placeholder,
+    textarea::placeholder {
+        color: #94a3b8 !important;
+        opacity: 1 !important;
+    }
+
+    label[data-testid="stWidgetLabel"],
+    [data-testid="stWidgetLabel"] p,
+    label {
+        color: #0f172a !important;
+        font-weight: 700 !important;
+        font-size: 0.75rem !important;
+    }
+
+    /* Clean Card Sections (Stitch style) */
+    .stitch-card {
+        background-color: #ffffff !important;
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 16px !important;
+        padding: 1.5rem !important;
+        margin-bottom: 1rem !important;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05) !important;
     }
     
-    /* Main container */
-    .main .block-container {
-        padding-top: 3rem;
-        max-width: 960px;
-    }
-
-    /* Header styling */
-    .hero-title {
-        font-size: 2.8rem;
-        font-weight: 800;
-        color: #1B2A4A;
-        margin-bottom: 0.1rem;
-        letter-spacing: -0.8px;
-    }
-    .hero-subtitle {
-        font-size: 1.15rem;
-        color: #555555;
-        margin-bottom: 2.5rem;
-        line-height: 1.6;
-    }
-
-    /* Clean Card Sections */
-    .config-section {
-        background: #ffffff;
-        border-radius: 12px;
-        padding: 1.75rem;
-        margin-bottom: 1.5rem;
-        border: 1px solid #e2e8f0;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
-    }
-    .config-section h3 {
-        color: #1B2A4A;
-        font-size: 1.1rem;
-        font-weight: 700;
-        margin-bottom: 0.8rem;
-    }
-
-    /* Upload area styling */
-    [data-testid="stFileUploader"] {
-        border: 1px dashed #cbd5e1;
-        border-radius: 12px;
-        padding: 1rem;
-        background-color: #f8fafc;
-    }
-
-    /* Primary Generate button with Teal-to-Navy gradient */
-    .stButton > button {
-        background: linear-gradient(135deg, #2E86AB 0%, #1B2A4A 100%);
-        color: white;
-        border: none;
-        padding: 0.85rem 2.2rem;
-        font-size: 1.15rem;
-        font-weight: 600;
-        border-radius: 8px;
-        width: 100%;
-        box-shadow: 0 10px 15px -3px rgba(46, 134, 171, 0.25);
-        transition: all 0.2s ease-in-out;
-    }
-    .stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 10px 20px -2px rgba(46, 134, 171, 0.35);
-        color: #ffffff !important;
-    }
-    .stButton > button:active {
-        transform: translateY(0);
-    }
-
-    /* Sidebar (White Mode styling) */
-    [data-testid="stSidebar"] {
-        background-color: #f8fafc;
-        border-right: 1px solid #e2e8f0;
-    }
-    [data-testid="stSidebar"] .block-container {
-        padding-top: 2rem;
-    }
-
-    /* Clean white privacy badge */
-    .privacy-badge {
-        background-color: #f0fdf4;
-        border: 1px solid #bbf7d0;
-        border-radius: 10px;
-        padding: 1.25rem;
-        margin-top: 1rem;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.02);
-    }
-    .privacy-badge h4 {
-        color: #166534;
-        font-size: 0.95rem;
-        font-weight: 700;
-        margin-top: 0;
-        margin-bottom: 0.4rem;
-    }
-    .privacy-badge p {
-        color: #1e3a1e;
-        font-size: 0.85rem;
-        line-height: 1.5;
-        margin: 0;
-    }
-
-    /* Pipeline steps indicator */
-    .pipeline-step {
+    .card-header {
         display: flex;
         align-items: center;
-        padding: 0.5rem 0;
-        color: #475569;
-        font-size: 0.9rem;
-        font-weight: 500;
+        gap: 0.75rem;
+        margin-bottom: 0.5rem;
     }
-    .pipeline-step .step-num {
-        background: #2E86AB;
-        color: white;
+    .card-icon-box-green {
+        background-color: #f0fdf4;
+        padding: 0.5rem;
+        border-radius: 8px;
+        color: #166534;
+        display: inline-flex;
+    }
+    .card-icon-box-blue {
+        background-color: #eff6ff;
+        padding: 0.5rem;
+        border-radius: 8px;
+        color: #2563eb;
+        display: inline-flex;
+    }
+    .card-title-text {
+        font-weight: 700;
+        color: #0f172a !important;
+        font-size: 1.05rem;
+    }
+    .card-subtitle-text {
+        font-size: 0.75rem;
+        color: #94a3b8 !important;
+        margin-top: 0.1rem;
+    }
+
+    /* Dropzone pattern styling */
+    [data-testid="stFileUploader"] {
+        border: 2px dashed #cbd5e1 !important;
+        border-radius: 12px !important;
+        padding: 1.5rem !important;
+        background-color: #fafbfc !important;
+        text-align: center;
+    }
+    [data-testid="stFileUploader"] label {
+        color: #0f172a !important;
+        font-weight: 600 !important;
+    }
+
+    /* Blueprint Info Banner */
+    .blueprint-info-banner {
+        background-color: #eff6ff !important;
+        border: 1px solid #dbeafe !important;
+        border-radius: 12px !important;
+        padding: 1rem !important;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+        color: #1e40af !important;
+        font-weight: 600;
+        font-size: 0.875rem;
+    }
+    .blueprint-icon-circle {
+        background-color: #2563eb;
+        color: #ffffff;
         width: 24px;
         height: 24px;
         border-radius: 50%;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        font-size: 0.75rem;
+        font-size: 14px;
+        font-weight: bold;
+    }
+
+    /* Primary Generate button shadow and active effect */
+    .stButton > button {
+        background-color: #2563eb !important;
+        color: #ffffff !important;
+        border: none !important;
+        padding: 0.9rem 2rem !important;
+        font-size: 1rem !important;
+        font-weight: 700 !important;
+        border-radius: 12px !important;
+        width: 100% !important;
+        box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.2) !important;
+        transition: all 0.15s ease-in-out !important;
+    }
+    .stButton > button:hover {
+        background-color: #1d4ed8 !important;
+        transform: translateY(-1px) !important;
+        box-shadow: 0 12px 20px -2px rgba(37, 99, 235, 0.3) !important;
+        color: #ffffff !important;
+    }
+    .stButton > button:active {
+        transform: scale(0.99) !important;
+    }
+
+    /* Sidebar Navigation Steps */
+    [data-testid="stSidebar"],
+    [data-testid="stSidebar"] > div {
+        background-color: #f2f4f6 !important;
+        border-right: 1px solid #e2e8f0 !important;
+    }
+    [data-testid="stSidebar"] .block-container {
+        padding-top: 2rem;
+    }
+    
+    .sidebar-step-item {
+        display: flex;
+        gap: 0.75rem;
+        align-items: flex-start;
+        margin-bottom: 1rem;
+    }
+    .sidebar-step-num-active {
+        background-color: #2563eb !important;
+        color: #ffffff !important;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
         font-weight: 700;
-        margin-right: 0.75rem;
-        box-shadow: 0 2px 4px rgba(46, 134, 171, 0.2);
+    }
+    .sidebar-step-num-inactive {
+        background-color: #e2e8f0 !important;
+        color: #64748b !important;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: 700;
+    }
+    .sidebar-step-icon-card {
+        background-color: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 0.4rem;
+        display: inline-flex;
+        color: #64748b;
+    }
+    .sidebar-step-icon-card-active {
+        background-color: #ffffff;
+        border: 1px solid #dbeafe;
+        border-radius: 8px;
+        padding: 0.4rem;
+        display: inline-flex;
+        color: #2563eb;
+    }
+    .sidebar-step-text-active {
+        font-size: 0.875rem;
+        font-weight: 700;
+        color: #2563eb !important;
+        margin-top: 0.15rem;
+    }
+    .sidebar-step-text-inactive {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #475569 !important;
+        margin-top: 0.15rem;
+    }
+
+    /* Privacy Banner Box */
+    .sidebar-privacy-box {
+        background-color: #ffffff !important;
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 12px !important;
+        padding: 1rem !important;
+        margin-top: 2rem !important;
+    }
+    .sidebar-privacy-header {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: #2563eb !important;
+        font-weight: 700;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 0.5rem;
+    }
+    .sidebar-privacy-desc {
+        font-size: 0.725rem;
+        color: #64748b !important;
+        line-height: 1.5;
+        margin: 0;
     }
 </style>
 """, unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------------------------
-# Sidebar
+# Sidebar (Stitch UI layout conversion)
 # ---------------------------------------------------------------------------
 
 with st.sidebar:
-    st.markdown("### DeckMate")
-    st.markdown("*AI-Powered Deck Generator*")
+    # Sidebar Header
+    st.markdown("""
+    <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.25rem;">
+        <div style="background-color: #2563eb; padding: 0.4rem; border-radius: 8px; display: inline-flex; color: white;">
+            <span class="material-icons-outlined" style="font-size: 1.25rem;">description</span>
+        </div>
+        <h2 style="font-size: 1.25rem; font-weight: 800; color: #0f172a; margin: 0; tracking-tight: -0.5px;">DeckMate</h2>
+    </div>
+    <p style="font-size: 0.75rem; color: #64748b; font-weight: 500; margin-top: 0; margin-left: 2.6rem;">AI-Powered Deck Generator</p>
+    """, unsafe_allow_html=True)
 
     st.markdown("---")
 
-    st.markdown("#### How it works")
+    # Step list indicators based on design system
     st.markdown("""
-    <div class="pipeline-step">
-        <span class="step-num">1</span>
-        Upload your Excel file (.xlsx)
+    <p style="font-size: 10px; font-weight: 800; color: #64748b; uppercase: true; letter-spacing: 1px; margin-bottom: 1rem;">HOW IT WORKS</p>
+    
+    <div class="sidebar-step-item">
+        <div class="sidebar-step-num-active">1</div>
+        <div class="sidebar-step-icon-card-active">
+            <span class="material-icons-outlined" style="font-size: 1.1rem;">upload_file</span>
+        </div>
+        <span class="sidebar-step-text-active">Upload your Excel file</span>
     </div>
-    <div class="pipeline-step">
-        <span class="step-num">2</span>
-        Describe your audience & focus
+    
+    <div class="sidebar-step-item">
+        <div class="sidebar-step-num-inactive">2</div>
+        <div class="sidebar-step-icon-card">
+            <span class="material-icons-outlined" style="font-size: 1.1rem;">groups</span>
+        </div>
+        <span class="sidebar-step-text-inactive">Describe your audience & focus</span>
     </div>
-    <div class="pipeline-step">
-        <span class="step-num">3</span>
-        AI plans your slide structure
+    
+    <div class="sidebar-step-item">
+        <div class="sidebar-step-num-inactive">3</div>
+        <div class="sidebar-step-icon-card">
+            <span class="material-icons-outlined" style="font-size: 1.1rem;">auto_awesome</span>
+        </div>
+        <span class="sidebar-step-text-inactive">AI plans your slide structure</span>
     </div>
-    <div class="pipeline-step">
-        <span class="step-num">4</span>
-        Real charts built from your data
+    
+    <div class="sidebar-step-item">
+        <div class="sidebar-step-num-inactive">4</div>
+        <div class="sidebar-step-icon-card">
+            <span class="material-icons-outlined" style="font-size: 1.1rem;">bar_chart</span>
+        </div>
+        <span class="sidebar-step-text-inactive">Real charts built from data</span>
     </div>
-    <div class="pipeline-step">
-        <span class="step-num">5</span>
-        Download your .pptx deck
+    
+    <div class="sidebar-step-item">
+        <div class="sidebar-step-num-inactive">5</div>
+        <div class="sidebar-step-icon-card">
+            <span class="material-icons-outlined" style="font-size: 1.1rem;">download</span>
+        </div>
+        <span class="sidebar-step-text-inactive">Download your .pptx deck</span>
     </div>
     """, unsafe_allow_html=True)
 
     st.markdown("---")
 
+    # Clean privacy box
     st.markdown("""
-    <div class="privacy-badge">
-        <h4>🔒 Privacy First</h4>
-        <p>
-            Your file is processed <strong>in-memory</strong> and never stored.
-            Only aggregated summaries are sent to the AI model — never raw
-            row-level data. No files, sessions, or conversation history
-            are persisted.
+    <div class="sidebar-privacy-box">
+        <div class="sidebar-privacy-header">
+            <span class="material-icons-outlined" style="font-size: 1rem;">verified_user</span>
+            <span>Privacy First</span>
+        </div>
+        <p class="sidebar-privacy-desc">
+            Your file is processed in-memory and never stored. Only aggregated summaries are sent to the AI model — never raw data. No files, sessions, or conversation history are persisted.
         </p>
     </div>
     """, unsafe_allow_html=True)
@@ -217,25 +403,48 @@ with st.sidebar:
 
 
 # ---------------------------------------------------------------------------
-# Main content
+# Main content (Stitch UI layout conversion)
 # ---------------------------------------------------------------------------
 
-st.markdown('<p class="hero-title">DeckMate</p>', unsafe_allow_html=True)
-st.markdown(
-    '<p class="hero-subtitle">'
-    'Turn messy, multi-tab Excel sheets into polished, presentation-ready '
-    'PowerPoint decks — with real charts, AI-written insights, and '
-    'audience-aware framing.'
-    '</p>',
-    unsafe_allow_html=True,
-)
+# Welcome Hero Section (Side-by-side title and image using st.columns)
+hero_col1, hero_col2 = st.columns([0.65, 0.35], gap="large")
 
-# ---- File upload ----
-st.markdown("#### 📂 Upload your Excel file")
+with hero_col1:
+    st.markdown("""
+    <div class="welcome-badge" style="margin-top: 0.2rem;">Welcome to DeckMate</div>
+    <h2 class="welcome-title">
+        Create your deck <span style="color: #2563eb;">in minutes</span>
+        <span class="material-icons-outlined" style="color: #2563eb; vertical-align: top; font-size: 1.5rem; margin-left: 0.25rem;">auto_awesome</span>
+    </h2>
+    <p class="welcome-desc">
+        Turn messy, multi-tab Excel sheets into polished, presentation-ready PowerPoint decks — with real charts, AI-written insights, and audience-aware framing.
+    </p>
+    """, unsafe_allow_html=True)
+
+with hero_col2:
+    st.image(
+        "image.png",
+        width="stretch",
+    )
+
+# Step 1: Upload Card (Stitch style wrapper)
+st.markdown("""
+<div class="stitch-card">
+    <div class="card-header">
+        <div class="card-icon-box-green">
+            <span class="material-icons-outlined">table_view</span>
+        </div>
+        <div>
+            <div class="card-title-text">Upload your Excel file</div>
+            <div class="card-subtitle-text">Supports .xlsx files up to 10MB</div>
+        </div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
 uploaded_file = st.file_uploader(
     "Drag and drop or browse for a .xlsx file",
     type=["xlsx"],
-    help="Multi-tab workbooks work best. Max recommended size: 10 MB.",
     label_visibility="collapsed",
 )
 
@@ -246,25 +455,36 @@ if uploaded_file:
         f"({file_size_mb:.1f} MB)"
     )
 
-st.markdown("---")
+st.markdown("<br>", unsafe_allow_html=True)
 
-# ---- Prompt input ----
-st.markdown("#### 💬 Describe your deck")
+# Step 2: Describe Card (Stitch style wrapper)
+st.markdown("""
+<div class="stitch-card">
+    <div class="card-header">
+        <div class="card-icon-box-blue">
+            <span class="material-icons-outlined">psychology</span>
+        </div>
+        <div>
+            <div class="card-title-text">Describe your deck</div>
+            <div class="card-subtitle-text">What should this deck focus on? Who is the audience?</div>
+        </div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
 col1, col2 = st.columns([3, 1])
 
 with col1:
     user_prompt = st.text_area(
-        "What should this deck focus on? Who is the audience?",
+        "Focus Area",
         placeholder=(
             "Example: Focus on regional sales performance and marketing ROI. "
             "This is for a senior leadership quarterly review. "
             "Use professional, concise language. "
             "Highlight any standout trends or areas of concern."
         ),
-        height=120,
-        help="Be specific about focus areas, audience, and tone. "
-             "The AI uses this to decide slide structure and writing style.",
+        height=180,
+        label_visibility="collapsed",
     )
 
 with col2:
@@ -277,20 +497,26 @@ with col2:
         help="Includes title and summary slides.",
     )
 
+    st.markdown("<div style='margin-top: 1rem;'></div>", unsafe_allow_html=True)
+
     audience_preset = st.selectbox(
         "Quick preset",
         options=["Custom (use text above)", "Senior Leadership", "Client-Facing",
-                 "Internal Team", "Board Presentation"],
-        help="Optional: auto-adjusts tone if no custom prompt is given.",
+                 "Board Presentation", "Internal Team"],
     )
 
-st.markdown("---")
+st.markdown("<br>", unsafe_allow_html=True)
 
 # ---- Generate button ----
 generate_disabled = uploaded_file is None
 
 if generate_disabled:
-    st.info("Upload an Excel file to get started.")
+    st.markdown("""
+    <div class="blueprint-info-banner">
+        <div class="blueprint-icon-circle">i</div>
+        <span>Upload an Excel file to get started.</span>
+    </div>
+    """, unsafe_allow_html=True)
 
 generate_clicked = st.button(
     "Generate Deck",
