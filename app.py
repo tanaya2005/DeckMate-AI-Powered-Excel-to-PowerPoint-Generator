@@ -58,8 +58,8 @@ st.markdown("""
 
     /* Main container bounds */
     .main .block-container {
-        padding-top: 2rem !important;
-        padding-bottom: 4rem !important;
+        padding-top: 0.25rem !important;
+        padding-bottom: 0.5rem !important;
         max-width: 1000px !important;
     }
 
@@ -67,22 +67,22 @@ st.markdown("""
     .welcome-badge {
         color: #2563eb !important;
         font-weight: 700;
-        font-size: 0.875rem;
-        margin-bottom: 0.5rem;
+        font-size: 0.95rem;
+        margin-bottom: 0.1rem;
     }
     .welcome-title {
-        font-size: 2.25rem;
+        font-size: 2.1rem;
         font-weight: 800;
         color: #0f172a !important;
-        margin-bottom: 0.75rem;
+        margin-bottom: 0.2rem;
         letter-spacing: -0.5px;
-        line-height: 1.25;
+        line-height: 1.15;
     }
     .welcome-desc {
-        font-size: 1rem;
+        font-size: 1.0rem;
         color: #64748b !important;
-        line-height: 1.6;
-        margin-bottom: 2rem;
+        line-height: 1.45;
+        margin-bottom: 0.5rem;
     }
 
     /* Force controls to render high-contrast white mode regardless of system preferences */
@@ -101,7 +101,7 @@ st.markdown("""
         background-color: #ffffff !important;
         border: 1px solid #cbd5e1 !important;
         border-radius: 8px !important;
-        font-size: 0.875rem !important;
+        font-size: 0.95rem !important;
     }
 
     [data-testid="stTextarea"] textarea::placeholder,
@@ -115,16 +115,16 @@ st.markdown("""
     label {
         color: #0f172a !important;
         font-weight: 700 !important;
-        font-size: 0.75rem !important;
+        font-size: 0.825rem !important;
     }
 
     /* Clean Card Sections (Stitch style) */
     .stitch-card {
         background-color: #ffffff !important;
         border: 1px solid #cbd5e1 !important;
-        border-radius: 16px !important;
-        padding: 1.5rem !important;
-        margin-bottom: 1rem !important;
+        border-radius: 12px !important;
+        padding: 0.75rem !important;
+        margin-bottom: 0.5rem !important;
         box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05) !important;
     }
     
@@ -132,18 +132,18 @@ st.markdown("""
         display: flex;
         align-items: center;
         gap: 0.75rem;
-        margin-bottom: 0.5rem;
+        margin-bottom: 0.25rem;
     }
     .card-icon-box-green {
         background-color: #f0fdf4;
-        padding: 0.5rem;
+        padding: 0.4rem;
         border-radius: 8px;
         color: #166534;
         display: inline-flex;
     }
     .card-icon-box-blue {
         background-color: #eff6ff;
-        padding: 0.5rem;
+        padding: 0.4rem;
         border-radius: 8px;
         color: #2563eb;
         display: inline-flex;
@@ -163,7 +163,7 @@ st.markdown("""
     [data-testid="stFileUploader"] {
         border: 2px dashed #cbd5e1 !important;
         border-radius: 12px !important;
-        padding: 1.5rem !important;
+        padding: 0.6rem 1rem !important;
         background-color: #fafbfc !important;
         text-align: center;
     }
@@ -204,18 +204,18 @@ st.markdown("""
         background-color: #2563eb !important;
         color: #ffffff !important;
         border: none !important;
-        padding: 0.9rem 2rem !important;
-        font-size: 1rem !important;
+        padding: 0.75rem 2rem !important;
+        font-size: 1.1rem !important;
         font-weight: 700 !important;
         border-radius: 12px !important;
         width: 100% !important;
-        box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.2) !important;
+        box-shadow: 0 8px 12px -3px rgba(37, 99, 235, 0.2) !important;
         transition: all 0.15s ease-in-out !important;
     }
     .stButton > button:hover {
         background-color: #1d4ed8 !important;
         transform: translateY(-1px) !important;
-        box-shadow: 0 12px 20px -2px rgba(37, 99, 235, 0.3) !important;
+        box-shadow: 0 10px 15px -2px rgba(37, 99, 235, 0.3) !important;
         color: #ffffff !important;
     }
     .stButton > button:active {
@@ -229,14 +229,15 @@ st.markdown("""
         border-right: 1px solid #e2e8f0 !important;
     }
     [data-testid="stSidebar"] .block-container {
-        padding-top: 2rem;
+        padding-top: 0.75rem !important;
+        padding-bottom: 1rem !important;
     }
     
     .sidebar-step-item {
         display: flex;
         gap: 0.75rem;
         align-items: flex-start;
-        margin-bottom: 1rem;
+        margin-bottom: 0.6rem !important;
     }
     .sidebar-step-num-active {
         background-color: #2563eb !important;
@@ -279,13 +280,13 @@ st.markdown("""
         color: #2563eb;
     }
     .sidebar-step-text-active {
-        font-size: 0.875rem;
+        font-size: 0.95rem;
         font-weight: 700;
         color: #2563eb !important;
         margin-top: 0.15rem;
     }
     .sidebar-step-text-inactive {
-        font-size: 0.875rem;
+        font-size: 0.95rem;
         font-weight: 600;
         color: #475569 !important;
         margin-top: 0.15rem;
@@ -296,8 +297,8 @@ st.markdown("""
         background-color: #ffffff !important;
         border: 1px solid #cbd5e1 !important;
         border-radius: 12px !important;
-        padding: 1rem !important;
-        margin-top: 2rem !important;
+        padding: 0.75rem !important;
+        margin-top: 1rem !important;
     }
     .sidebar-privacy-header {
         display: flex;
@@ -305,13 +306,13 @@ st.markdown("""
         gap: 0.5rem;
         color: #2563eb !important;
         font-weight: 700;
-        font-size: 0.75rem;
+        font-size: 0.825rem;
         text-transform: uppercase;
         letter-spacing: 0.5px;
-        margin-bottom: 0.5rem;
+        margin-bottom: 0.4rem;
     }
     .sidebar-privacy-desc {
-        font-size: 0.725rem;
+        font-size: 0.775rem;
         color: #64748b !important;
         line-height: 1.5;
         margin: 0;
@@ -327,20 +328,19 @@ st.markdown("""
 with st.sidebar:
     # Sidebar Header
     st.markdown("""
-    <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.25rem;">
-        <div style="background-color: #2563eb; padding: 0.4rem; border-radius: 8px; display: inline-flex; color: white;">
-            <span class="material-icons-outlined" style="font-size: 1.25rem;">description</span>
+    <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: -0.5rem; margin-bottom: 0.1rem;">
+        <div style="background-color: #2563eb; padding: 0.3rem; border-radius: 8px; display: inline-flex; color: white;">
+            <span class="material-icons-outlined" style="font-size: 1.1rem;">description</span>
         </div>
-        <h2 style="font-size: 1.25rem; font-weight: 800; color: #0f172a; margin: 0; tracking-tight: -0.5px;">DeckMate</h2>
+        <h2 style="font-size: 1.2rem; font-weight: 800; color: #0f172a; margin: 0; tracking-tight: -0.5px;">DeckMate</h2>
     </div>
-    <p style="font-size: 0.75rem; color: #64748b; font-weight: 500; margin-top: 0; margin-left: 2.6rem;">AI-Powered Deck Generator</p>
+    <p style="font-size: 0.725rem; color: #64748b; font-weight: 500; margin-top: 0; margin-bottom: 0.5rem; margin-left: 2.2rem;">AI-Powered Deck Generator</p>
     """, unsafe_allow_html=True)
-
-    st.markdown("---")
 
     # Step list indicators based on design system
     st.markdown("""
-    <p style="font-size: 10px; font-weight: 800; color: #64748b; uppercase: true; letter-spacing: 1px; margin-bottom: 1rem;">HOW IT WORKS</p>
+    <hr style="margin: 0.5rem 0 !important; border: 0; border-top: 1px solid #cbd5e1;">
+    <p style="font-size: 10px; font-weight: 800; color: #64748b; uppercase: true; letter-spacing: 1px; margin-bottom: 0.6rem; margin-top: 0.4rem;">HOW IT WORKS</p>
     
     <div class="sidebar-step-item">
         <div class="sidebar-step-num-active">1</div>
@@ -383,10 +383,9 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("---")
-
     # Clean privacy box
     st.markdown("""
+    <hr style="margin: 0.5rem 0 !important; border: 0; border-top: 1px solid #cbd5e1;">
     <div class="sidebar-privacy-box">
         <div class="sidebar-privacy-header">
             <span class="material-icons-outlined" style="font-size: 1rem;">verified_user</span>
@@ -396,9 +395,8 @@ with st.sidebar:
             Your file is processed in-memory and never stored. Only aggregated summaries are sent to the AI model — never raw data. No files, sessions, or conversation history are persisted.
         </p>
     </div>
+    <hr style="margin: 0.5rem 0 !important; border: 0; border-top: 1px solid #cbd5e1;">
     """, unsafe_allow_html=True)
-
-    st.markdown("---")
     st.caption("Built with Streamlit + Groq + python-pptx")
 
 
@@ -427,26 +425,29 @@ with hero_col2:
         width="stretch",
     )
 
-# Step 1: Upload Card (Stitch style wrapper)
+# Step 1: Upload Card (Stitch style wrapper with dropzone inside)
 st.markdown("""
-<div class="stitch-card">
-    <div class="card-header">
+<div class="stitch-card" style="margin-bottom: -0.25rem !important; padding: 0.85rem !important;">
+    <div class="card-header" style="margin-bottom: 0.25rem !important;">
         <div class="card-icon-box-green">
             <span class="material-icons-outlined">table_view</span>
         </div>
         <div>
-            <div class="card-title-text">Upload your Excel file</div>
-            <div class="card-subtitle-text">Supports .xlsx files up to 10MB</div>
+            <div class="card-title-text" style="font-size: 1.15rem !important;">Upload your Excel file</div>
+            <div class="card-subtitle-text" style="font-size: 0.825rem !important;">Supports .xlsx files up to 10MB</div>
         </div>
     </div>
 </div>
 """, unsafe_allow_html=True)
 
+# Custom spacing wrapper around uploader to merge cleanly
+st.markdown("<div style='margin-top: -1.85rem; margin-bottom: 0.5rem;'>", unsafe_allow_html=True)
 uploaded_file = st.file_uploader(
     "Drag and drop or browse for a .xlsx file",
     type=["xlsx"],
     label_visibility="collapsed",
 )
+st.markdown("</div>", unsafe_allow_html=True)
 
 if uploaded_file:
     file_size_mb = uploaded_file.size / (1024 * 1024)
@@ -455,23 +456,23 @@ if uploaded_file:
         f"({file_size_mb:.1f} MB)"
     )
 
-st.markdown("<br>", unsafe_allow_html=True)
-
 # Step 2: Describe Card (Stitch style wrapper)
 st.markdown("""
-<div class="stitch-card">
-    <div class="card-header">
+<div class="stitch-card" style="margin-bottom: -0.25rem !important; padding: 0.85rem !important;">
+    <div class="card-header" style="margin-bottom: 0.25rem !important;">
         <div class="card-icon-box-blue">
             <span class="material-icons-outlined">psychology</span>
         </div>
         <div>
-            <div class="card-title-text">Describe your deck</div>
-            <div class="card-subtitle-text">What should this deck focus on? Who is the audience?</div>
+            <div class="card-title-text" style="font-size: 1.15rem !important;">Describe your deck</div>
+            <div class="card-subtitle-text" style="font-size: 0.825rem !important;">What should this deck focus on? Who is the audience?</div>
         </div>
     </div>
 </div>
 """, unsafe_allow_html=True)
 
+# Custom spacing wrapper around description inputs to merge cleanly
+st.markdown("<div style='margin-top: -1.05rem; margin-bottom: 0.5rem;'>", unsafe_allow_html=True)
 col1, col2 = st.columns([3, 1])
 
 with col1:
@@ -497,7 +498,7 @@ with col2:
         help="Includes title and summary slides.",
     )
 
-    st.markdown("<div style='margin-top: 1rem;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='margin-top: 0.25rem;'></div>", unsafe_allow_html=True)
 
     audience_preset = st.selectbox(
         "Quick preset",
@@ -505,14 +506,14 @@ with col2:
                  "Board Presentation", "Internal Team"],
     )
 
-st.markdown("<br>", unsafe_allow_html=True)
+st.markdown("</div>", unsafe_allow_html=True)
 
 # ---- Generate button ----
 generate_disabled = uploaded_file is None
 
 if generate_disabled:
     st.markdown("""
-    <div class="blueprint-info-banner">
+    <div class="blueprint-info-banner" style="margin-bottom: 0.5rem !important;">
         <div class="blueprint-icon-circle">i</div>
         <span>Upload an Excel file to get started.</span>
     </div>
