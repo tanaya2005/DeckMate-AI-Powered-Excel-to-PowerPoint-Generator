@@ -29,7 +29,7 @@ from groq import Groq
 # Constants
 # ---------------------------------------------------------------------------
 
-DEFAULT_MODEL = "llama-3.1-8b-instant"
+DEFAULT_MODEL = "llama-3.3-70b-versatile"
 MAX_RETRIES = 1  # retry once on JSON parse failure
 
 VALID_CHART_TYPES = {"bar", "pie", "line", "table", "text"}
@@ -60,15 +60,21 @@ Your job is to produce a structured slide plan as a JSON array.
     "source_sheet": "Name of the Excel sheet this slide draws data from (string)",
     "chart_type":   "One of: bar, pie, line, table, text (string)",
     "data_columns": ["list", "of", "column", "names", "to", "chart/table"],
-    "insight_text": "A structured string starting with a bold header followed by 2-3 bullet points. Each bullet point MUST lead with a concrete number, percentage, or key metric from the data. Format: **[Short Bold Heading]**\\n• **[Metric 1]**: Detailed explanation of data point 1...\\n• **[Metric 2]**: Trend or percentage comparison...\\n• **[Metric 3]**: Strategic takeaway or action item.",
-    "kpis":         {
-                      "KPI 1 Label": "KPI 1 Value (concrete number/metric from summary)",
-                      "KPI 2 Label": "KPI 2 Value (concrete number/metric from summary)",
-                      "KPI 3 Label": "KPI 3 Value (concrete number/metric from summary)"
-                    }
+    "insight_text": "A structured string starting with a bold header followed by 2-3 bullet points. Do NOT state specific numeric values in insight_text — describe trends, rankings, and relationships in words and placeholders only, because you do not have access to exact computed totals. Instead, you MUST use the following placeholders where appropriate so the server can inject the verified numbers:\n    - {{TOP_CATEGORY}}: Category name with the highest value (e.g., 'History')\n    - {{TOP_VALUE}}: The highest aggregated value (e.g., '514')\n    - {{TOP_PCT}}: The percentage share of the top category (e.g., '36.4%')\n    - {{SECOND_CATEGORY}}: Category name with the second highest value\n    - {{SECOND_VALUE}}: The second highest aggregated value\n    - {{SECOND_PCT}}: The percentage share of the second category\n    - {{BOTTOM_CATEGORY}}: Category name with the lowest value\n    - {{BOTTOM_VALUE}}: The lowest aggregated value\n    - {{TOTAL_VALUE}}: The sum of all values in the main value column\n    - {{MEAN_VALUE}}: The average of all values in the main value column\n    - {{COUNT}}: The count of records/categories\n    Format: **[Short Bold Heading]**\\n• **{{TOP_CATEGORY}}**: Leads with {{TOP_VALUE}} units, representing {{TOP_PCT}} of total...\\n• **{{SECOND_CATEGORY}}**: Represents the second highest share at {{SECOND_VALUE}}...\\n• **Takeaway**: General strategic note.",
+    "kpis":         [
+                      {"label": "Lowest Category Stock", "type": "extreme_category", "group_by": "Category", "value_col": "Current Stock", "agg": "sum", "which": "min"},
+                      {"label": "Average Stock per Supplier", "type": "avg_per_group", "group_by": "Supplier", "value_col": "Current Stock", "agg": "sum"},
+                      {"label": "Reorder Rate", "type": "filtered_rate", "filter_col": "Reorder Status", "filter_contains": "Reorder"}
+                    ]
   }
 
-- Note: Every slide MUST have 2-3 specific KPIs under the 'kpis' key, populated with actual aggregate statistics from the summary (e.g. Total Revenue, Average Order Value, Total Units Sold, Supplier Count, etc.) that match the context of that slide. For "text" slides, set 'kpis' to an empty object {}.
+- Note: Every data slide (bar/pie/line/table) MUST have 2-3 KPI definitions under the 'kpis' key. Each KPI is a specification dictionary that MUST match one of the following exact shapes (depending on the type of metric needed):
+  1) {"label": "Display Label", "type": "extreme_category", "group_by": "<category_column>", "value_col": "<value_column>", "agg": "sum"|"mean"|"count"|"max"|"min", "which": "min"|"max"} (computes min/max category and its value)
+  2) {"label": "Display Label", "type": "avg_per_group", "group_by": "<category_column>", "value_col": "<value_column>", "agg": "sum"|"mean"|"count"|"max"|"min"} (computes mean of the grouped sums/means)
+  3) {"label": "Display Label", "type": "filtered_rate", "filter_col": "<filter_column>", "filter_contains": "<substring_to_match>"} (computes % of rows matching filter)
+  4) {"label": "Display Label", "type": "filtered_sum", "filter_col": "<filter_column>", "filter_contains": "<substring_to_match>", "value_col": "<value_column>"} (sums a column for matching rows only)
+  5) {"label": "Display Label", "type": "peak_point", "x_col": "<date_or_x_column>", "value_col": "<numeric_value_column>"} (finds date/x at maximum value)
+  Do NOT put numeric values in the slide plan — the system will compute all values using these specifications. For "text" slides, set 'kpis' to [].
 - For "text" chart_type slides (e.g. title slide, summary slide), set
   data_columns to an empty list [] and source_sheet to "none".
 
@@ -183,9 +189,19 @@ def _parse_slide_plan(raw_text: str) -> list:
         missing = required_keys - slide.keys()
         if missing:
             raise ValueError(f"Slide {i} missing keys: {missing}")
-        # Default missing KPIs to empty dict
-        if "kpis" not in slide or not isinstance(slide["kpis"], dict):
-            slide["kpis"] = {}
+        # Validate and normalize KPIs to list-of-dicts format
+        raw_kpis = slide.get("kpis", [])
+        if isinstance(raw_kpis, dict):
+            # Legacy format {label: value} — convert to new descriptive format
+            raw_kpis = []
+        if not isinstance(raw_kpis, list):
+            raw_kpis = []
+        # Keep only well-formed KPI defs (having 'label' and 'type')
+        valid_kpis = []
+        for kpi in raw_kpis:
+            if isinstance(kpi, dict) and "label" in kpi and "type" in kpi:
+                valid_kpis.append(kpi)
+        slide["kpis"] = valid_kpis
         # Normalise chart_type
         slide["chart_type"] = slide["chart_type"].lower().strip()
         if slide["chart_type"] not in VALID_CHART_TYPES:

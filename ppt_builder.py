@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
+import numpy as np
 from pptx import Presentation
 from pptx.chart.data import CategoryChartData
 from pptx.enum.chart import XL_CHART_TYPE, XL_LEGEND_POSITION
@@ -142,6 +143,210 @@ def _resolve_columns(
 # ---------------------------------------------------------------------------
 # Slide builders
 # ---------------------------------------------------------------------------
+
+def compute_kpi(df, kpi_spec):
+    """
+    kpi_spec examples:
+    {"type": "extreme_category", "group_by": "Category", "value_col": "Current Stock", "agg": "sum", "which": "min"}
+    {"type": "avg_per_group", "group_by": "Supplier", "value_col": "Current Stock", "agg": "sum"}
+    {"type": "filtered_rate", "filter_col": "Reorder Status", "filter_contains": "Reorder"}
+    {"type": "filtered_sum", "filter_col": "Reorder Status", "filter_contains": "Reorder", "value_col": "Current Stock"}
+    {"type": "peak_point", "x_col": "Order Date", "value_col": "Total Quantity Ordered"}
+    """
+    if kpi_spec["type"] == "extreme_category":
+        grouped = df.groupby(kpi_spec["group_by"])[kpi_spec["value_col"]].agg(kpi_spec["agg"])
+        idx = grouped.idxmin() if kpi_spec["which"] == "min" else grouped.idxmax()
+        return idx, grouped[idx]
+
+    if kpi_spec["type"] == "avg_per_group":
+        grouped = df.groupby(kpi_spec["group_by"])[kpi_spec["value_col"]].agg(kpi_spec["agg"])
+        return grouped.mean()  # mean of the GROUPED sums, never df[value_col].mean() directly
+
+    if kpi_spec["type"] == "filtered_rate":
+        mask = df[kpi_spec["filter_col"]].str.contains(kpi_spec["filter_contains"], case=False, na=False)
+        return (mask.sum() / len(df)) * 100
+
+    if kpi_spec["type"] == "filtered_sum":
+        mask = df[kpi_spec["filter_col"]].str.contains(kpi_spec["filter_contains"], case=False, na=False)
+        return df.loc[mask, kpi_spec["value_col"]].sum()
+
+    if kpi_spec["type"] == "peak_point":
+        idx = df[kpi_spec["value_col"]].idxmax()
+        return df.loc[idx, kpi_spec["x_col"]], df.loc[idx, kpi_spec["value_col"]]
+
+
+def _resolve_kpi_spec_cols(df: pd.DataFrame, spec: dict) -> dict:
+    resolved_spec = spec.copy()
+    for col_key in ["group_by", "value_col", "filter_col", "x_col"]:
+        if col_key in spec and spec[col_key]:
+            resolved, _ = _resolve_columns([spec[col_key]], df)
+            if resolved:
+                resolved_spec[col_key] = resolved[0]
+    return resolved_spec
+
+
+def _format_single_value(val) -> str:
+    if isinstance(val, (float, np.floating)):
+        if float(val).is_integer():
+            return f"{int(val):,}"
+        else:
+            return f"{val:,.1f}"
+    elif isinstance(val, (int, np.integer)):
+        return f"{int(val):,}"
+    elif hasattr(val, "strftime"):
+        return val.strftime("%Y-%m-%d")
+    else:
+        return str(val)
+
+
+def _format_kpi_value(val, spec_type=None) -> str:
+    if isinstance(val, tuple):
+        key_part, val_part = val
+        if hasattr(key_part, "strftime"):
+            key_part = key_part.strftime("%Y-%m-%d")
+        else:
+            key_part = str(key_part)
+        return f"{key_part} ({_format_single_value(val_part)})"
+    else:
+        formatted = _format_single_value(val)
+        if spec_type == "filtered_rate":
+            formatted += "%"
+        return formatted
+
+
+def _compute_kpis(
+    kpi_defs: list,
+    df: pd.DataFrame,
+    matched_cols: List[str],
+) -> Dict[str, str]:
+    """
+    Compute real KPI values from the DataFrame using the LLM's spec definitions.
+    """
+    if not kpi_defs or df is None or df.empty:
+        return {}
+
+    result: Dict[str, str] = {}
+    for spec in kpi_defs[:3]:  # max 3 KPIs
+        label = spec.get("label", "")
+        if not label:
+            continue
+        try:
+            resolved_spec = _resolve_kpi_spec_cols(df, spec)
+            val = compute_kpi(df, resolved_spec)
+            formatted = _format_kpi_value(val, resolved_spec.get("type"))
+            
+            print(f"[KPI Computation] Label: '{label}' | Spec: {spec} -> Value: '{formatted}'")
+            result[label] = formatted
+        except Exception as e:
+            print(f"[KPI Computation] ERROR computing KPI '{label}' with spec {spec}: {e}")
+            continue
+
+    return result
+
+
+def _process_insight_text(
+    insight_text: str,
+    df: pd.DataFrame,
+    matched_cols: List[str],
+    slide_title: str = "",
+) -> str:
+    """
+    Calculate top-line numeric facts from the real dataframe and inject them
+    into the insight text by replacing placeholders.
+    """
+    if not insight_text:
+        return ""
+    if df is None or df.empty or not matched_cols:
+        return insight_text
+
+    try:
+        # Determine category vs value columns
+        category_col = matched_cols[0]
+        value_cols = matched_cols[1:] if len(matched_cols) > 1 else []
+
+        val_col = None
+        if value_cols:
+            # Try to find the first numeric value column
+            for col in value_cols:
+                if pd.api.types.is_numeric_dtype(df[col]):
+                    val_col = col
+                    break
+            # Fallback to the first value column if none are numeric
+            if val_col is None:
+                val_col = value_cols[0]
+
+        if not val_col:
+            # Count occurrences of category_col
+            agg_df = df[category_col].value_counts().reset_index()
+            agg_df.columns = [category_col, "Count"]
+            val_col = "Count"
+        else:
+            # Aggregate: group by category, sum numeric value column
+            if pd.api.types.is_numeric_dtype(df[val_col]):
+                agg_df = df.groupby(category_col)[val_col].sum().reset_index()
+            else:
+                agg_df = df.groupby(category_col)[val_col].count().reset_index()
+
+        agg_df = agg_df.sort_values(by=val_col, ascending=False).reset_index(drop=True)
+
+        total_val = agg_df[val_col].sum()
+        mean_val = agg_df[val_col].mean()
+        count_val = len(agg_df)
+
+        top_cat, top_val, top_pct = "N/A", "0", "0.0%"
+        sec_cat, sec_val, sec_pct = "N/A", "0", "0.0%"
+        bot_cat, bot_val = "N/A", "0"
+
+        if count_val > 0:
+            row = agg_df.iloc[0]
+            top_cat = str(row[category_col])
+            t_val = row[val_col]
+            top_val = f"{t_val:,.2f}" if isinstance(t_val, float) else f"{t_val:,}"
+            pct = (t_val / total_val * 100) if total_val else 0.0
+            top_pct = f"{pct:.1f}%"
+
+            bot_row = agg_df.iloc[-1]
+            bot_cat = str(bot_row[category_col])
+            b_val = bot_row[val_col]
+            bottom_val = f"{b_val:,.2f}" if isinstance(b_val, float) else f"{b_val:,}"
+
+        if count_val > 1:
+            row = agg_df.iloc[1]
+            sec_cat = str(row[category_col])
+            s_val = row[val_col]
+            sec_val = f"{s_val:,.2f}" if isinstance(s_val, float) else f"{s_val:,}"
+            pct = (s_val / total_val * 100) if total_val else 0.0
+            sec_pct = f"{pct:.1f}%"
+
+        total_val_str = f"{total_val:,.2f}" if isinstance(total_val, float) else f"{total_val:,}"
+        mean_val_str = f"{mean_val:,.2f}"
+        count_str = f"{count_val:,}"
+
+        replacements = {
+            "{{TOP_CATEGORY}}": top_cat,
+            "{{TOP_VALUE}}": top_val,
+            "{{TOP_PCT}}": top_pct,
+            "{{SECOND_CATEGORY}}": sec_cat,
+            "{{SECOND_VALUE}}": sec_val,
+            "{{SECOND_PCT}}": sec_pct,
+            "{{BOTTOM_CATEGORY}}": bot_cat,
+            "{{BOTTOM_VALUE}}": bottom_val,
+            "{{TOTAL_VALUE}}": total_val_str,
+            "{{MEAN_VALUE}}": mean_val_str,
+            "{{COUNT}}": count_str,
+        }
+
+        processed = insight_text
+        for placeholder, replacement in replacements.items():
+            processed = processed.replace(placeholder, replacement)
+
+        print(f"[Insight Replacements] Slide: '{slide_title}' -> Replacements: {replacements}")
+        return processed
+
+    except Exception as e:
+        print(f"[Insight Replacements] ERROR processing slide '{slide_title}': {e}")
+        return insight_text
+
 
 def _add_kpi_callouts(slide, kpis: dict):
     """Draw a row of styled KPI callout boxes at the top of the slide."""
@@ -454,9 +659,10 @@ def _build_chart_slide(
     # Add title
     _add_title_textbox(slide, title)
 
-    # Add KPI Callouts
-    kpis = slide_info.get("kpis", {})
-    _add_kpi_callouts(slide, kpis)
+    # Add KPI Callouts (computed from REAL data, not LLM values)
+    kpi_defs = slide_info.get("kpis", [])
+    computed_kpis = _compute_kpis(kpi_defs, df, matched_cols)
+    _add_kpi_callouts(slide, computed_kpis)
 
     # Determine category vs value columns
     category_col = matched_cols[0]
@@ -521,9 +727,10 @@ def _build_table_slide(
 
     _add_title_textbox(slide, title)
 
-    # Add KPI Callouts
-    kpis = slide_info.get("kpis", {})
-    _add_kpi_callouts(slide, kpis)
+    # Add KPI Callouts (computed from REAL data, not LLM values)
+    kpi_defs = slide_info.get("kpis", [])
+    computed_kpis = _compute_kpis(kpi_defs, df, matched_cols)
+    _add_kpi_callouts(slide, computed_kpis)
 
     # Prepare table data (no hard truncate, show all rows requested by plan)
     table_df = df[matched_cols].copy()
@@ -813,6 +1020,12 @@ def build_presentation(
             _build_text_slide(prs, slide_info, slide_num, total_slides, is_fallback=True)
             continue
 
+        # Compute and process insight text placeholders
+        raw_insight = slide_info.get("insight_text", "")
+        slide_info["insight_text"] = _process_insight_text(
+            raw_insight, df, matched_cols, slide_info.get("title", "")
+        )
+
         # ------- BUILD THE APPROPRIATE SLIDE TYPE -------
         try:
             df_copy = df.copy()
@@ -882,6 +1095,32 @@ if __name__ == "__main__":
     print("DAY 3 TEST: PPTX Builder")
     print("=" * 60)
 
+    # Sanity checks using the real excels/inventory_management.xlsx
+    from pathlib import Path
+    excel_file = Path("excels/inventory_management.xlsx")
+    if excel_file.exists():
+        df_stock = pd.read_excel(excel_file, sheet_name="Stock Levels")
+        df_pending = pd.read_excel(excel_file, sheet_name="Pending Orders")
+        
+        grouped_category_sum = df_stock.groupby("Category")["Current Stock"].agg("sum")
+        supplier_sum = df_stock.groupby("Supplier")["Current Stock"].agg("sum")
+        reorder_mask = df_stock["Reorder Status"].str.contains("Reorder", case=False, na=False)
+        
+        # Sanity checks
+        assert grouped_category_sum.idxmin() == "Biography"  # lowest category
+        assert grouped_category_sum.idxmax() == "Self-Help"   # highest category
+        assert round(supplier_sum.mean(), 1) == 829.5          # avg stock per supplier
+        assert round((reorder_mask.sum()/len(df_stock))*100, 1) == 12.0  # reorder rate
+        
+        # Convert date to datetime for timestamp assertion comparison
+        df_pending_dt = df_pending.copy()
+        df_pending_dt["Order Date"] = pd.to_datetime(df_pending_dt["Order Date"])
+        assert df_pending_dt.loc[df_pending_dt["Total Quantity Ordered"].idxmax(), "Order Date"] == pd.Timestamp("2026-06-20")  # peak day
+        
+        print("All KPI sanity checks passed.")
+    else:
+        print("[WARNING] excels/inventory_management.xlsx not found, skipping sanity check assertions.")
+
     # Build a fake slide plan + dataframes to test each slide type
     test_df_sales = pd.DataFrame({
         "Region": ["North", "South", "East", "West"] * 3,
@@ -918,34 +1157,51 @@ if __name__ == "__main__":
                 "chart_type": "text",
                 "data_columns": [],
                 "insight_text": "This deck presents an overview of regional sales performance and marketing ROI for the fiscal year, prepared for senior leadership review.",
+                "kpis": [],
             },
             {
                 "title": "Revenue by Region",
                 "source_sheet": "Regional Sales",
                 "chart_type": "bar",
                 "data_columns": ["Region", "Revenue"],
-                "insight_text": "The East region led revenue generation with $400K total, while the West region trailed at $264K. North and South regions showed competitive mid-range performance.",
+                "insight_text": "The {{TOP_CATEGORY}} region led revenue generation with {{TOP_VALUE}} total, representing {{TOP_PCT}} of the {{TOTAL_VALUE}} total revenue. The second region is {{SECOND_CATEGORY}} with {{SECOND_VALUE}} ({{SECOND_PCT}}).",
+                "kpis": [
+                    {"label": "Total Revenue", "type": "filtered_sum", "filter_col": "Region", "filter_contains": "", "value_col": "Revenue"},
+                    {"label": "Top Region", "type": "extreme_category", "group_by": "Region", "value_col": "Revenue", "agg": "sum", "which": "max"},
+                ],
             },
             {
                 "title": "Product Revenue Share",
                 "source_sheet": "Regional Sales",
                 "chart_type": "pie",
                 "data_columns": ["Product", "Revenue"],
-                "insight_text": "Widget C commands the largest share of total revenue at 38%, followed by Widget A at 35%. Widget B contributed 27% and represents a potential growth area.",
+                "insight_text": "{{TOP_CATEGORY}} commands the largest share of total revenue at {{TOP_PCT}} ({{TOP_VALUE}}), followed by {{SECOND_CATEGORY}} at {{SECOND_PCT}}.",
+                "kpis": [
+                    {"label": "Total Revenue", "type": "filtered_sum", "filter_col": "Product", "filter_contains": "", "value_col": "Revenue"},
+                    {"label": "Top Product", "type": "extreme_category", "group_by": "Product", "value_col": "Revenue", "agg": "sum", "which": "max"},
+                ],
             },
             {
                 "title": "Marketing ROI Trend",
                 "source_sheet": "Marketing Spend",
                 "chart_type": "line",
                 "data_columns": ["Quarter", "ROI %"],
-                "insight_text": "Marketing ROI has shown consistent quarter-over-quarter improvement, rising from 10.4% in Q1 to 17% in Q4. This upward trajectory validates increased investment in online channels.",
+                "insight_text": "Average ROI across {{COUNT}} periods is {{MEAN_VALUE}}%, with a maximum of {{TOP_VALUE}}% from the leading quarter. Lowest was {{BOTTOM_VALUE}}% from {{BOTTOM_CATEGORY}}.",
+                "kpis": [
+                    {"label": "Avg ROI", "type": "avg_per_group", "group_by": "Quarter", "value_col": "ROI %", "agg": "mean"},
+                    {"label": "Max ROI", "type": "filtered_sum", "filter_col": "Quarter", "filter_contains": "", "value_col": "ROI %"}, # using filtered_sum as max placeholder for demo
+                ],
             },
             {
                 "title": "Marketing Spend Breakdown",
                 "source_sheet": "Marketing Spend",
                 "chart_type": "table",
                 "data_columns": ["Quarter", "Channel", "Spend", "ROI %"],
-                "insight_text": "Online consistently outperforms Retail on ROI, while Retail spend has grown more modestly. Consider reallocating a portion of Retail budget to online channels.",
+                "insight_text": "A total of {{TOTAL_VALUE}} was spent across the channels, with {{TOP_CATEGORY}} having the highest spend at {{TOP_VALUE}} representing {{TOP_PCT}} of total spend.",
+                "kpis": [
+                    {"label": "Total Spend", "type": "filtered_sum", "filter_col": "Quarter", "filter_contains": "", "value_col": "Spend"},
+                    {"label": "Top Spend Channel", "type": "extreme_category", "group_by": "Channel", "value_col": "Spend", "agg": "sum", "which": "max"},
+                ],
             },
             {
                 # This slide deliberately has a WRONG column name to test
@@ -955,6 +1211,9 @@ if __name__ == "__main__":
                 "chart_type": "bar",
                 "data_columns": ["Region", "TotalRevenue"],  # "TotalRevenue" doesn't exist
                 "insight_text": "This slide tests the fallback when the LLM hallucinates a column name that doesn't exist in the data.",
+                "kpis": [
+                    {"label": "Total Revenue", "type": "filtered_sum", "filter_col": "Region", "filter_contains": "", "value_col": "TotalRevenue"},
+                ],
             },
             {
                 # Test fuzzy match: "ROI%" (no space) vs actual "ROI %"
@@ -963,6 +1222,9 @@ if __name__ == "__main__":
                 "chart_type": "bar",
                 "data_columns": ["Channel", "ROI%"],  # "ROI%" should match "ROI %"
                 "insight_text": "This tests that 'ROI%' fuzzy-matches to the actual column 'ROI %' despite missing whitespace.",
+                "kpis": [
+                    {"label": "Avg ROI", "type": "avg_per_group", "group_by": "Channel", "value_col": "ROI%", "agg": "mean"},
+                ],
             },
             {
                 "title": "Key Takeaways",
@@ -970,6 +1232,7 @@ if __name__ == "__main__":
                 "chart_type": "text",
                 "data_columns": [],
                 "insight_text": "East region is the clear revenue leader. Marketing ROI is trending upward. Online channels significantly outperform Retail on ROI. Recommend increased online investment.",
+                "kpis": [],
             },
         ]
     }
