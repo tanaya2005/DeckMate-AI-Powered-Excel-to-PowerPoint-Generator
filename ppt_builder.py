@@ -984,49 +984,38 @@ def build_presentation(
         source_sheet = slide_info.get("source_sheet", "none")
         data_columns = slide_info.get("data_columns", [])
 
-        # ------- TEXT SLIDES (no data needed) -------
-        if chart_type == "text" or source_sheet.lower() == "none":
-            _build_text_slide(prs, slide_info, slide_num, total_slides)
-            continue
-
-        # ------- DATA SLIDES (chart / table) -------
         # Find the source dataframe
-        df = dataframes.get(source_sheet)
-        if df is None or df.empty:
-            # Sheet not found or empty → fallback to text
-            print(f"[ppt_builder] WARNING: Sheet '{source_sheet}' not found or empty "
-                  f"for slide {slide_num} ('{slide_info.get('title', '')}'). "
-                  f"Rendering as text slide.")
-            _build_text_slide(prs, slide_info, slide_num, total_slides, is_fallback=True)
+        df = None
+        if source_sheet.lower() != "none":
+            df = dataframes.get(source_sheet)
+
+        matched_cols = []
+        if df is not None and not df.empty and data_columns:
+            # ------- COLUMN VALIDATION (trust boundary) -------
+            matched_cols, unmatched_cols = _resolve_columns(data_columns, df)
+
+            if unmatched_cols:
+                print(f"[ppt_builder] WARNING: Slide {slide_num} ('{slide_info.get('title', '')}') "
+                      f"— LLM requested columns {unmatched_cols} which don't exist in "
+                      f"sheet '{source_sheet}'. Available: {list(df.columns)}")
+
+            if matched_cols:
+                # Compute and process insight text placeholders
+                raw_insight = slide_info.get("insight_text", "")
+                slide_info["insight_text"] = _process_insight_text(
+                    raw_insight, df, matched_cols, slide_info.get("title", "")
+                )
+
+        # ------- TEXT SLIDES (no data needed or requested as text slide) -------
+        if chart_type == "text" or source_sheet.lower() == "none" or df is None or df.empty or len(matched_cols) < 1:
+            is_fallback = (source_sheet.lower() != "none" and (df is None or df.empty or len(matched_cols) < 1))
+            if is_fallback:
+                print(f"[ppt_builder] WARNING: Falling back to text slide for slide {slide_num} due to missing data/columns.")
+            _build_text_slide(prs, slide_info, slide_num, total_slides, is_fallback=is_fallback)
             continue
-
-        if not data_columns:
-            # No columns specified → text slide
-            _build_text_slide(prs, slide_info, slide_num, total_slides)
-            continue
-
-        # ------- COLUMN VALIDATION (trust boundary) -------
-        matched_cols, unmatched_cols = _resolve_columns(data_columns, df)
-
-        if unmatched_cols:
-            print(f"[ppt_builder] WARNING: Slide {slide_num} ('{slide_info.get('title', '')}') "
-                  f"— LLM requested columns {unmatched_cols} which don't exist in "
-                  f"sheet '{source_sheet}'. Available: {list(df.columns)}")
-
-        if len(matched_cols) < 1:
-            # No valid columns at all → fallback to text
-            print(f"[ppt_builder] WARNING: No valid columns for slide {slide_num}. "
-                  f"Rendering as text-only fallback.")
-            _build_text_slide(prs, slide_info, slide_num, total_slides, is_fallback=True)
-            continue
-
-        # Compute and process insight text placeholders
-        raw_insight = slide_info.get("insight_text", "")
-        slide_info["insight_text"] = _process_insight_text(
-            raw_insight, df, matched_cols, slide_info.get("title", "")
-        )
 
         # ------- BUILD THE APPROPRIATE SLIDE TYPE -------
+        start_slide_count = len(prs.slides)
         try:
             df_copy = df.copy()
             if chart_type in ("bar", "pie", "line"):
@@ -1041,6 +1030,11 @@ def build_presentation(
                 _build_text_slide(prs, slide_info, slide_num, total_slides)
 
         except Exception as e:
+            # If slide building failed, clean up any slide(s) added during this failed attempt
+            while len(prs.slides) > start_slide_count:
+                slide_id_list = prs.slides._sldIdLst
+                del slide_id_list[-1]
+
             # If chart building fails for any reason, fallback to text
             print(f"[ppt_builder] ERROR building slide {slide_num}: {e}. "
                   f"Falling back to text slide.")
@@ -1076,6 +1070,24 @@ def build_presentation(
     p_sub.space_before = Pt(12)
     
     _add_footer(closing_slide, total_slides, total_slides)
+
+    # Validate that total slide count matches expectations
+    assert len(prs.slides) == total_slides, f"Mismatch: {len(prs.slides)} slides built but total_slides was {total_slides}"
+
+    # Scan every text frame & table cell in the entire presentation for literal substring "{{"
+    for slide_idx, sld in enumerate(prs.slides):
+        for shape in sld.shapes:
+            if shape.has_text_frame:
+                txt = shape.text_frame.text
+                if "{{" in txt:
+                    print(f"[ValidationError] Unfilled placeholder found in Slide {slide_idx+1}: {txt}")
+                    raise ValueError(f"Unfilled template placeholder found in Slide {slide_idx+1}")
+            if shape.has_table:
+                for row in shape.table.rows:
+                    for cell in row.cells:
+                        if "{{" in cell.text:
+                            print(f"[ValidationError] Unfilled placeholder in table cell in Slide {slide_idx+1}: {cell.text}")
+                            raise ValueError(f"Unfilled template placeholder found in table in Slide {slide_idx+1}")
 
     # Save
     prs.save(output_path)
@@ -1120,6 +1132,32 @@ if __name__ == "__main__":
         print("All KPI sanity checks passed.")
     else:
         print("[WARNING] excels/inventory_management.xlsx not found, skipping sanity check assertions.")
+
+    bookstore_file = Path("excels/bookstore_billing.xlsx")
+    if bookstore_file.exists():
+        df_books = pd.read_excel(bookstore_file, sheet_name="Billing Transactions")
+        
+        # 1. Top genre == "Sci-Fi" with count 24
+        genre_counts = df_books.groupby("Genre")["Quantity"].count()
+        assert genre_counts.idxmax() == "Sci-Fi"
+        assert genre_counts.max() == 24
+        
+        # 2. Top payment method == "UPI" with count 27
+        pay_counts = df_books.groupby("Payment Method")["Quantity"].count()
+        assert pay_counts.idxmax() == "UPI"
+        assert pay_counts.max() == 27
+        
+        # 3. Average quantity ≈ 2.67
+        avg_qty = df_books["Quantity"].mean()
+        assert abs(avg_qty - 2.67) < 0.01
+        
+        # 4. Average price per unit ≈ 13.36
+        avg_price = df_books["Price Per Unit"].mean()
+        assert abs(avg_price - 13.36) < 0.01
+        
+        print("All bookstore sanity checks passed.")
+    else:
+        print("[WARNING] excels/bookstore_billing.xlsx not found, skipping bookstore checks.")
 
     # Build a fake slide plan + dataframes to test each slide type
     test_df_sales = pd.DataFrame({
