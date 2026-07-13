@@ -1,6 +1,6 @@
 # DeckMate — AI-Powered Excel → PowerPoint Generator
 
-[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io/)
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://deckmate.streamlit.app/)
 
 Turns messy, multi-tab sales Excel sheets into a polished, presentation-ready PowerPoint deck — complete with real charts (bar/pie/line), auto-written interpretations, and audience-aware framing (client-facing vs internal/senior-facing).
 
@@ -95,17 +95,3 @@ OR
 
 
 python -m streamlit run app.py
-
-```
-
----
-
-## Roadmap
-
-See [ROADMAP.md](./ROADMAP.md) for the day-by-day build plan (1 week, ~2 hrs/day) with prompts for AI-assisted ("vibecoded") development.
-
----
-
-## Status
-
-🚧 In active development — built as a portfolio project and for real deployment for a sales-team use case.
