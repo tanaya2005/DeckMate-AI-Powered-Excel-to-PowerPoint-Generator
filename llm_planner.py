@@ -32,9 +32,9 @@ except ImportError:
 # Constants
 # ---------------------------------------------------------------------------
 
-DEFAULT_GEMINI_MODEL = "gemini-1.5-flash"
+DEFAULT_GEMINI_MODEL = "gemini-flash-latest"
 DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile"
-DEFAULT_MODEL = "gemini-1.5-flash"
+DEFAULT_MODEL = "gemini-flash-latest"
 MAX_RETRIES = 1  # retry once on JSON parse failure
 
 VALID_CHART_TYPES = {"bar", "pie", "line", "table", "text"}
@@ -224,47 +224,66 @@ def _parse_slide_plan(raw_text: str) -> list:
 # Public API
 # ---------------------------------------------------------------------------
 
-def _call_gemini_api(api_key: str, system_prompt: str, user_message: str, model_name: str = DEFAULT_GEMINI_MODEL) -> str:
-    """Calls Google Gemini API using google-genai or google-generativeai."""
+def _call_gemini_api(api_key: str, system_prompt: str, user_message: str, model_name: Optional[str] = None) -> str:
+    """Calls Google Gemini API using google-genai or google-generativeai with multi-model fallback."""
+    candidate_models = []
+    if model_name:
+        candidate_models.append(model_name)
+    for fallback in ["gemini-flash-latest", "gemini-3.5-flash-lite", "gemini-3.8-flash"]:
+        if fallback not in candidate_models:
+            candidate_models.append(fallback)
+
     errors = []
+
     # Attempt 1: modern google.genai SDK
     try:
         from google import genai
         from google.genai import types
         client = genai.Client(api_key=api_key)
-        response = client.models.generate_content(
-            model=model_name,
-            contents=user_message,
-            config=types.GenerateContentConfig(
-                system_instruction=system_prompt,
-                temperature=0.4,
-                response_mime_type="application/json",
-            ),
-        )
-        if response and response.text:
-            return response.text
+        for m in candidate_models:
+            try:
+                response = client.models.generate_content(
+                    model=m,
+                    contents=user_message,
+                    config=types.GenerateContentConfig(
+                        system_instruction=system_prompt,
+                        temperature=0.4,
+                        response_mime_type="application/json",
+                    ),
+                )
+                if response and response.text:
+                    return response.text
+            except Exception as e:
+                errors.append(f"{m} (google.genai): {e}")
+                continue
     except Exception as e:
-        errors.append(f"google.genai error: {e}")
+        errors.append(f"google.genai init: {e}")
 
     # Attempt 2: google.generativeai SDK
     try:
         import google.generativeai as legacy_genai
         legacy_genai.configure(api_key=api_key)
-        model = legacy_genai.GenerativeModel(
-            model_name=model_name,
-            system_instruction=system_prompt,
-            generation_config={
-                "temperature": 0.4,
-                "response_mime_type": "application/json",
-            },
-        )
-        response = model.generate_content(user_message)
-        if response and response.text:
-            return response.text
+        for m in candidate_models:
+            try:
+                model = legacy_genai.GenerativeModel(
+                    model_name=m,
+                    system_instruction=system_prompt,
+                    generation_config={
+                        "temperature": 0.4,
+                        "response_mime_type": "application/json",
+                    },
+                )
+                response = model.generate_content(user_message)
+                if response and response.text:
+                    return response.text
+            except Exception as e:
+                errors.append(f"{m} (google.generativeai): {e}")
+                continue
     except Exception as e:
-        errors.append(f"google.generativeai error: {e}")
+        errors.append(f"google.generativeai init: {e}")
 
-    raise RuntimeError(f"Gemini API call failed: {' | '.join(errors)}")
+    raise RuntimeError(f"Gemini API call failed: {' | '.join(errors[:2])}")
+
 
 
 def _call_groq_api(api_key: str, system_prompt: str, user_message: str, model_name: str = DEFAULT_GROQ_MODEL) -> str:
