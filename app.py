@@ -397,7 +397,7 @@ with st.sidebar:
     </div>
     <hr style="margin: 0.5rem 0 !important; border: 0; border-top: 1px solid #cbd5e1;">
     """, unsafe_allow_html=True)
-    st.caption("Built with Streamlit + Groq + python-pptx")
+    st.caption("Built with Streamlit + Gemini + python-pptx")
 
 
 # ---------------------------------------------------------------------------

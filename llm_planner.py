@@ -23,13 +23,18 @@ try:
 except ImportError:
     pass
 
-from groq import Groq
+try:
+    from groq import Groq
+except ImportError:
+    Groq = None
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
-DEFAULT_MODEL = "llama-3.3-70b-versatile"
+DEFAULT_GEMINI_MODEL = "gemini-1.5-flash"
+DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile"
+DEFAULT_MODEL = "gemini-1.5-flash"
 MAX_RETRIES = 1  # retry once on JSON parse failure
 
 VALID_CHART_TYPES = {"bar", "pie", "line", "table", "text"}
@@ -219,15 +224,75 @@ def _parse_slide_plan(raw_text: str) -> list:
 # Public API
 # ---------------------------------------------------------------------------
 
+def _call_gemini_api(api_key: str, system_prompt: str, user_message: str, model_name: str = DEFAULT_GEMINI_MODEL) -> str:
+    """Calls Google Gemini API using google-genai or google-generativeai."""
+    errors = []
+    # Attempt 1: modern google.genai SDK
+    try:
+        from google import genai
+        from google.genai import types
+        client = genai.Client(api_key=api_key)
+        response = client.models.generate_content(
+            model=model_name,
+            contents=user_message,
+            config=types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                temperature=0.4,
+                response_mime_type="application/json",
+            ),
+        )
+        if response and response.text:
+            return response.text
+    except Exception as e:
+        errors.append(f"google.genai error: {e}")
+
+    # Attempt 2: google.generativeai SDK
+    try:
+        import google.generativeai as legacy_genai
+        legacy_genai.configure(api_key=api_key)
+        model = legacy_genai.GenerativeModel(
+            model_name=model_name,
+            system_instruction=system_prompt,
+            generation_config={
+                "temperature": 0.4,
+                "response_mime_type": "application/json",
+            },
+        )
+        response = model.generate_content(user_message)
+        if response and response.text:
+            return response.text
+    except Exception as e:
+        errors.append(f"google.generativeai error: {e}")
+
+    raise RuntimeError(f"Gemini API call failed: {' | '.join(errors)}")
+
+
+def _call_groq_api(api_key: str, system_prompt: str, user_message: str, model_name: str = DEFAULT_GROQ_MODEL) -> str:
+    """Calls Groq API."""
+    if Groq is None:
+        raise RuntimeError("groq package is not installed. Install with: pip install groq")
+    client = Groq(api_key=api_key)
+    response = client.chat.completions.create(
+        model=model_name,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_message},
+        ],
+        temperature=0.4,
+        max_tokens=4096,
+    )
+    return response.choices[0].message.content
+
+
 def generate_slide_plan(
     data_summary: dict,
     user_prompt: str,
     num_slides: int = 8,
-    model: str = DEFAULT_MODEL,
+    model: Optional[str] = None,
     api_key: Optional[str] = None,
 ) -> dict:
     """
-    Call the Groq API to generate a structured slide plan.
+    Generate a structured slide plan using Gemini (default) or Groq.
 
     Parameters
     ----------
@@ -237,35 +302,53 @@ def generate_slide_plan(
         The user's instructions (focus areas, audience, tone, etc.).
     num_slides : int
         Number of slides to generate (default 8).
-    model : str
-        Groq model ID (default: llama-3.1-8b-instant).
+    model : str | None
+        Model ID (default: gemini-1.5-flash for Gemini, llama-3.3-70b-versatile for Groq).
     api_key : str | None
-        Groq API key. Falls back to GROQ_API_KEY env var / .env file.
+        API key. Falls back to GEMINI_API_KEY / GROQ_API_KEY from secrets or .env.
 
     Returns
     -------
     dict with key "slides" containing the list of slide plan dicts.
     """
-    # Resolve API key
-    key = api_key
-    if not key:
-        # Check Streamlit secrets first
-        try:
-            import streamlit as st
-            if "GROQ_API_KEY" in st.secrets:
-                key = st.secrets["GROQ_API_KEY"]
-        except Exception:
-            pass
-    if not key:
-        key = os.environ.get("GROQ_API_KEY")
-        
-    if not key:
-        raise RuntimeError(
-            "No Groq API key found. Set GROQ_API_KEY in your .env file, "
-            "as a Streamlit secret, or pass api_key= directly."
-        )
+    gemini_key = api_key if (api_key and not api_key.startswith("gsk_")) else None
+    groq_key = api_key if (api_key and api_key.startswith("gsk_")) else None
 
-    client = Groq(api_key=key)
+    # Check Streamlit secrets first
+    try:
+        import streamlit as st
+        if not gemini_key:
+            gemini_key = st.secrets.get("GEMINI_API_KEY") or st.secrets.get("GOOGLE_API_KEY")
+        if not groq_key:
+            groq_key = st.secrets.get("GROQ_API_KEY")
+    except Exception:
+        pass
+
+    # Check environment variables / .env
+    if not gemini_key:
+        gemini_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+    if not groq_key:
+        groq_key = os.environ.get("GROQ_API_KEY")
+
+    provider = None
+    resolved_key = None
+    chosen_model = model
+
+    if gemini_key and gemini_key.strip():
+        provider = "gemini"
+        resolved_key = gemini_key.strip()
+        if not chosen_model:
+            chosen_model = DEFAULT_GEMINI_MODEL
+    elif groq_key and groq_key.strip():
+        provider = "groq"
+        resolved_key = groq_key.strip()
+        if not chosen_model:
+            chosen_model = DEFAULT_GROQ_MODEL
+    else:
+        raise RuntimeError(
+            "No AI API key found. Please set GEMINI_API_KEY (recommended) or GROQ_API_KEY "
+            "in your .env file or Streamlit Cloud Settings -> Secrets."
+        )
 
     # Condense the summary to fit within token limits
     compact_summary = _condense_summary(data_summary)
@@ -282,7 +365,6 @@ def generate_slide_plan(
 
     for attempt in range(1 + MAX_RETRIES):
         try:
-            # Add retry hint to user message if this is a retry
             msg = user_message
             if attempt > 0:
                 msg += (
@@ -291,22 +373,17 @@ def generate_slide_plan(
                     "no explanation, no preamble. Just the [ ... ] array."
                 )
 
-            response = client.chat.completions.create(
-                model=model,
-                messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": msg},
-                ],
-                temperature=0.4,
-                max_tokens=4096,
-            )
+            if provider == "gemini":
+                raw_text = _call_gemini_api(resolved_key, SYSTEM_PROMPT, msg, chosen_model)
+            else:
+                raw_text = _call_groq_api(resolved_key, SYSTEM_PROMPT, msg, chosen_model)
 
-            raw_text = response.choices[0].message.content
             slides = _parse_slide_plan(raw_text)
 
             return {
                 "slides": slides,
-                "model": model,
+                "model": chosen_model,
+                "provider": provider,
                 "num_slides_requested": num_slides,
                 "num_slides_returned": len(slides),
             }
@@ -323,7 +400,8 @@ def generate_slide_plan(
                 ) from last_error
 
         except Exception as e:
-            raise RuntimeError(f"Groq API call failed: {e}") from e
+            raise RuntimeError(f"{provider.capitalize()} API call failed: {e}") from e
+
 
 
 # ---------------------------------------------------------------------------
